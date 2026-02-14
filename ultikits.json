@@ -1,0 +1,6 @@
+{
+  "identifyString": "ultimail",
+  "name": "UltiMail",
+  "shortDescription": "游戏内邮件系统，支持物品附件、领取时执行命令、批量发送和持久化邮箱GUI。",
+  "categoryId": 4
+}
