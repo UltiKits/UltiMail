@@ -1,6 +1,7 @@
 package com.ultikits.plugins.mail.commands;
 
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.command.CmdMapping;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.service.MailService;
 import com.ultikits.plugins.mail.utils.TestHelper;
@@ -272,6 +273,389 @@ class SendMailCommandTest {
             String value = (String) field.get(null);
 
             assertThat(value).isEqualTo("ultimail.admin.multiattach");
+        }
+    }
+
+    // ==================== sendMail method Tests ====================
+
+    @Nested
+    @DisplayName("sendMail 方法测试")
+    class SendMailMethodTests {
+
+        @Test
+        @DisplayName("sendMail 方法应该存在并有正确的参数")
+        void shouldHaveSendMailMethod() throws Exception {
+            Method method = SendMailCommand.class.getDeclaredMethod(
+                "sendMail", org.bukkit.entity.Player.class, String.class, String.class);
+            assertThat(method).isNotNull();
+        }
+
+        @Test
+        @DisplayName("sendMail 应该有 @CmdMapping 注解")
+        void shouldHaveCmdMappingAnnotation() throws Exception {
+            Method method = SendMailCommand.class.getDeclaredMethod(
+                "sendMail", org.bukkit.entity.Player.class, String.class, String.class);
+            CmdMapping mapping = method.getAnnotation(CmdMapping.class);
+            assertThat(mapping).isNotNull();
+            assertThat(mapping.format()).isEqualTo("<player> <subject>");
+        }
+    }
+
+    // ==================== sendMailWithItems method Tests ====================
+
+    @Nested
+    @DisplayName("sendMailWithItems 方法测试")
+    class SendMailWithItemsMethodTests {
+
+        @Test
+        @DisplayName("sendMailWithItems 应该有 @CmdMapping 注解")
+        void shouldHaveCmdMappingAnnotation() throws Exception {
+            Method method = SendMailCommand.class.getDeclaredMethod(
+                "sendMailWithItems", org.bukkit.entity.Player.class, String.class, String.class);
+            CmdMapping mapping = method.getAnnotation(CmdMapping.class);
+            assertThat(mapping).isNotNull();
+            assertThat(mapping.format()).isEqualTo("<player> <subject> attach");
+        }
+
+        @Test
+        @DisplayName("普通玩家null主手物品应该显示错误")
+        void shouldShowErrorWhenMainHandIsNull() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
+            when(senderInventory.getItemInMainHand()).thenReturn(null);
+
+            command.sendMailWithItems(sender, "receiver", "subject");
+
+            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[error_no_item_in_hand]")));
+        }
+
+        @Test
+        @DisplayName("管理员应该显示GUI提示消息")
+        void shouldShowGuiHintForAdmin() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(true);
+
+            try {
+                command.sendMailWithItems(sender, "receiver", "subject");
+            } catch (Exception e) {
+                // GUI open may fail in test
+            }
+
+            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[attachment_gui_hint]")
+            ));
+        }
+    }
+
+    // ==================== i18n Tests ====================
+
+    @Nested
+    @DisplayName("i18n 方法测试")
+    class I18nTests {
+
+        @Test
+        @DisplayName("i18n 应该委托给 ultiPlugin")
+        void shouldDelegateToUltiPlugin() throws Exception {
+            Method method = SendMailCommand.class.getDeclaredMethod("i18n", String.class);
+            method.setAccessible(true);
+
+            String result = (String) method.invoke(command, "test_key");
+
+            assertThat(result).isEqualTo("[test_key]");
+        }
+    }
+
+    // ==================== handleHelp Tests ====================
+
+    @Nested
+    @DisplayName("handleHelp 方法测试")
+    class HandleHelpTests {
+
+        @Test
+        @DisplayName("handleHelp 应该显示标题")
+        void shouldShowTitle() {
+            CommandSender cmdSender = mock(CommandSender.class);
+
+            try {
+                Method method = SendMailCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+                method.setAccessible(true);
+                method.invoke(command, cmdSender);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            verify(cmdSender, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[help_sendmail_title]")
+            ));
+        }
+
+        @Test
+        @DisplayName("handleHelp 应该显示取消提示")
+        void shouldShowCancelHint() {
+            CommandSender cmdSender = mock(CommandSender.class);
+
+            try {
+                Method method = SendMailCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+                method.setAccessible(true);
+                method.invoke(command, cmdSender);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            verify(cmdSender, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[help_cancel_hint]")
+            ));
+        }
+
+        @Test
+        @DisplayName("handleHelp 应该显示4条消息")
+        void shouldShowFourMessages() {
+            CommandSender cmdSender = mock(CommandSender.class);
+
+            try {
+                Method method = SendMailCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+                method.setAccessible(true);
+                method.invoke(command, cmdSender);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            verify(cmdSender, times(4)).sendMessage(any(String.class));
+        }
+    }
+
+    // ==================== ContentPrompt Detailed Tests ====================
+
+    @Nested
+    @DisplayName("ContentPrompt 详细测试")
+    class ContentPromptDetailedTests {
+
+        @Test
+        @DisplayName("ContentPrompt 应该有 getPromptText 和 acceptInput 方法")
+        void shouldHaveRequiredMethods() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+
+            // getPromptText
+            contentPromptClass.getDeclaredMethod("getPromptText",
+                org.bukkit.conversations.ConversationContext.class);
+            // acceptInput
+            contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+        }
+
+        @Test
+        @DisplayName("ContentPrompt 应该存储receiver和subject")
+        void shouldStoreReceiverAndSubject() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("TestReceiver", "TestSubject");
+
+            java.lang.reflect.Field receiverField = contentPromptClass.getDeclaredField("receiver");
+            receiverField.setAccessible(true);
+            java.lang.reflect.Field subjectField = contentPromptClass.getDeclaredField("subject");
+            subjectField.setAccessible(true);
+
+            assertThat(receiverField.get(prompt)).isEqualTo("TestReceiver");
+            assertThat(subjectField.get(prompt)).isEqualTo("TestSubject");
+        }
+
+        @Test
+        @DisplayName("acceptInput 输入cancel应返回 END_OF_CONVERSATION")
+        void shouldReturnEndOnCancel() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("TestReceiver", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            Object result = acceptInput.invoke(prompt, ctx, "cancel");
+
+            assertThat(result).isEqualTo(org.bukkit.conversations.Prompt.END_OF_CONVERSATION);
+        }
+
+        @Test
+        @DisplayName("acceptInput 输入null应返回 END_OF_CONVERSATION")
+        void shouldReturnEndOnNull() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("TestReceiver", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            Object result = acceptInput.invoke(prompt, ctx, null);
+
+            assertThat(result).isEqualTo(org.bukkit.conversations.Prompt.END_OF_CONVERSATION);
+        }
+
+        @Test
+        @DisplayName("acceptInput 正常输入应调用mailService.sendMail")
+        void shouldCallMailServiceOnValidInput() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+            when(ctx.getSessionData("attachItems")).thenReturn(null);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), any()))
+                .thenReturn(true);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            Object result = acceptInput.invoke(prompt, ctx, "这是邮件内容");
+
+            verify(mockMailService).sendMail(sender, "ReceiverName", "TestSubject", "这是邮件内容", null);
+            assertThat(result).isEqualTo(org.bukkit.conversations.Prompt.END_OF_CONVERSATION);
+        }
+
+        @Test
+        @DisplayName("acceptInput 发送成功应发送成功消息")
+        void shouldSendSuccessMessageOnSuccess() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+            when(ctx.getSessionData("attachItems")).thenReturn(null);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), any()))
+                .thenReturn(true);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            acceptInput.invoke(prompt, ctx, "邮件内容");
+
+            // Mock i18n returns "[mail_sent_success]", replace("{RECEIVER}", ...) has no effect
+            // since the mock key doesn't contain {RECEIVER}
+            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[mail_sent_success]")
+            ));
+        }
+
+        @Test
+        @DisplayName("acceptInput 发送失败不应发送成功消息")
+        void shouldNotSendSuccessMessageOnFailure() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+            when(ctx.getSessionData("attachItems")).thenReturn(null);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), any()))
+                .thenReturn(false);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            acceptInput.invoke(prompt, ctx, "邮件内容");
+
+            // Should NOT send success message when sendMail returns false
+            verify(sender, never()).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("ReceiverName")
+            ));
+        }
+
+        @Test
+        @DisplayName("getPromptText 应该调用 ultiPlugin.i18n")
+        void shouldCallI18nForPromptText() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("Receiver", "Subject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            Method getPromptText = contentPromptClass.getDeclaredMethod("getPromptText",
+                org.bukkit.conversations.ConversationContext.class);
+
+            String result = (String) getPromptText.invoke(prompt, ctx);
+
+            assertThat(result).contains("[input_content_prompt]");
+        }
+
+        @Test
+        @DisplayName("acceptInput 有附件时应传递附件")
+        void shouldPassAttachItemsToSendMail() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+
+            ItemStack mockItem = mock(ItemStack.class);
+            ItemStack[] attachItems = new ItemStack[]{mockItem};
+            when(ctx.getSessionData("attachItems")).thenReturn(attachItems);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), any()))
+                .thenReturn(true);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            acceptInput.invoke(prompt, ctx, "邮件内容");
+
+            verify(mockMailService).sendMail(sender, "ReceiverName", "TestSubject", "邮件内容", attachItems);
+        }
+    }
+
+    // ==================== startContentConversation Tests ====================
+
+    @Nested
+    @DisplayName("startContentConversation 测试")
+    class StartContentConversationTests {
+
+        @Test
+        @DisplayName("startContentConversation 方法应存在")
+        void shouldHaveStartContentConversationMethod() throws Exception {
+            Method method = SendMailCommand.class.getDeclaredMethod(
+                "startContentConversation", Player.class, String.class, String.class, ItemStack[].class);
+            assertThat(method).isNotNull();
         }
     }
 }

@@ -713,6 +713,251 @@ class MailCommandTest {
         }
     }
 
+    // ==================== countEmptySlots Tests ====================
+
+    @Nested
+    @DisplayName("countEmptySlots 测试 (间接测试)")
+    class CountEmptySlotsTests {
+
+        @Test
+        @DisplayName("空背包应该有足够空间")
+        void shouldCountAllSlotsAsEmpty() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mail.setItems("base64data");
+            mail.setClaimed(false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.getItemCount(mail)).thenReturn(2);
+            // All null = empty
+            when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null, null, null});
+            ItemStack diamond = mock(ItemStack.class);
+            when(mockMailService.claimItems(mail, player)).thenReturn(new ItemStack[]{diamond});
+
+            mailCommand.claim(player, 1);
+
+            verify(mockMailService).claimItems(mail, player);
+        }
+
+        @Test
+        @DisplayName("AIR物品应被视为空槽位")
+        void shouldCountAirSlotsAsEmpty() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mail.setItems("base64data");
+            mail.setClaimed(false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.getItemCount(mail)).thenReturn(1);
+            ItemStack airItem = mock(ItemStack.class);
+            when(airItem.getType()).thenReturn(Material.AIR);
+            when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{airItem, null});
+            ItemStack diamond = mock(ItemStack.class);
+            when(mockMailService.claimItems(mail, player)).thenReturn(new ItemStack[]{diamond});
+
+            mailCommand.claim(player, 1);
+
+            verify(mockMailService).claimItems(mail, player);
+        }
+
+        @Test
+        @DisplayName("满背包应该拒绝领取")
+        void shouldRejectWhenInventoryCompletelyFull() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mail.setItems("base64data");
+            mail.setClaimed(false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.getItemCount(mail)).thenReturn(3);
+            ItemStack stone = mock(ItemStack.class);
+            when(stone.getType()).thenReturn(Material.STONE);
+            when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{stone, stone});
+
+            mailCommand.claim(player, 1);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[claim_inventory_full]")));
+            verify(mockMailService, never()).claimItems(any(), any());
+        }
+    }
+
+    // ==================== readByIndex edge cases ====================
+
+    @Nested
+    @DisplayName("readByIndex 边界测试")
+    class ReadByIndexEdgeCaseTests {
+
+        @Test
+        @DisplayName("邮件无附件时不显示附件相关信息")
+        void shouldNotShowItemInfoWhenNoItems() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mail.setItems(null);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+
+            mailCommand.readByIndex(player, 1);
+
+            // Should not contain items hints
+            verify(player, never()).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[mail_detail_items_hint]") || msg.contains("[mail_detail_items_claimed]")
+            ));
+        }
+
+        @Test
+        @DisplayName("空收件箱读取任何索引都应失败")
+        void shouldFailForEmptyInbox() {
+            when(mockMailService.getInbox(playerUuid)).thenReturn(new ArrayList<>());
+
+            mailCommand.readByIndex(player, 1);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[error_invalid_index]")));
+        }
+
+        @Test
+        @DisplayName("最后一个索引应该成功读取")
+        void shouldReadLastIndex() {
+            List<MailData> mails = new ArrayList<>();
+            mails.add(createTestMail("sender1", false, false));
+            mails.add(createTestMail("sender2", false, false));
+            mails.add(createTestMail("sender3", false, false));
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+
+            mailCommand.readByIndex(player, 3);
+
+            verify(mockMailService).markAsRead(mails.get(2));
+        }
+    }
+
+    // ==================== sent edge cases ====================
+
+    @Nested
+    @DisplayName("sent 边界测试")
+    class SentEdgeCaseTests {
+
+        @Test
+        @DisplayName("已读发件应显示已读状态")
+        void shouldShowReadStatusForSentMail() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = new MailData();
+            mail.setSenderUuid(playerUuid.toString());
+            mail.setSenderName("TestPlayer");
+            mail.setReceiverUuid("r1");
+            mail.setReceiverName("receiver1");
+            mail.setSubject("Subject");
+            mail.setContent("Content");
+            mail.setRead(true);
+            mails.add(mail);
+            when(mockMailService.getSentMails(playerUuid)).thenReturn(mails);
+
+            mailCommand.sent(player);
+
+            verify(player, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[inbox_status_read]")
+            ));
+        }
+
+        @Test
+        @DisplayName("发件箱标题应显示邮件数量")
+        void shouldShowSentMailCount() {
+            List<MailData> mails = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                MailData mail = new MailData();
+                mail.setSenderUuid(playerUuid.toString());
+                mail.setSenderName("TestPlayer");
+                mail.setReceiverUuid("r" + i);
+                mail.setReceiverName("receiver" + i);
+                mail.setSubject("Subject" + i);
+                mail.setContent("Content");
+                mail.setRead(false);
+                mails.add(mail);
+            }
+            when(mockMailService.getSentMails(playerUuid)).thenReturn(mails);
+
+            mailCommand.sent(player);
+
+            verify(player, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("3")
+            ));
+        }
+    }
+
+    // ==================== delete edge cases ====================
+
+    @Nested
+    @DisplayName("delete 边界测试")
+    class DeleteEdgeCaseTests {
+
+        @Test
+        @DisplayName("空收件箱删除应失败")
+        void shouldFailForEmptyInboxDelete() {
+            when(mockMailService.getInbox(playerUuid)).thenReturn(new ArrayList<>());
+
+            mailCommand.delete(player, 1);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[error_invalid_index]")));
+        }
+
+        @Test
+        @DisplayName("超出范围索引删除应失败")
+        void shouldFailForOutOfRangeDeleteIndex() {
+            List<MailData> mails = new ArrayList<>();
+            mails.add(createTestMail("sender", false, false));
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+
+            mailCommand.delete(player, 2);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[error_invalid_index]")));
+        }
+    }
+
+    // ==================== MailService interaction Tests ====================
+
+    @Nested
+    @DisplayName("MailService 交互测试")
+    class MailServiceInteractionTests {
+
+        @Test
+        @DisplayName("inbox 应该使用正确的玩家UUID调用 getInbox")
+        void shouldCallGetInboxWithCorrectUuid() {
+            when(mockMailService.getInbox(playerUuid)).thenReturn(new ArrayList<>());
+
+            mailCommand.inbox(player);
+
+            verify(mockMailService).getInbox(playerUuid);
+        }
+
+        @Test
+        @DisplayName("sent 应该使用正确的玩家UUID调用 getSentMails")
+        void shouldCallGetSentMailsWithCorrectUuid() {
+            when(mockMailService.getSentMails(playerUuid)).thenReturn(new ArrayList<>());
+
+            mailCommand.sent(player);
+
+            verify(mockMailService).getSentMails(playerUuid);
+        }
+
+        @Test
+        @DisplayName("deleteAll 应该使用正确的玩家UUID")
+        void shouldCallDeleteAllWithCorrectUuid() {
+            when(mockMailService.deleteAllByReceiver(playerUuid)).thenReturn(0);
+
+            mailCommand.deleteAll(player);
+
+            verify(mockMailService).deleteAllByReceiver(playerUuid);
+        }
+
+        @Test
+        @DisplayName("deleteRead 应该使用正确的玩家UUID")
+        void shouldCallDeleteReadWithCorrectUuid() {
+            when(mockMailService.deleteReadByReceiver(playerUuid)).thenReturn(0);
+
+            mailCommand.deleteRead(player);
+
+            verify(mockMailService).deleteReadByReceiver(playerUuid);
+        }
+    }
+
     // Helper methods
     private MailData createTestMail(String senderName, boolean read, boolean claimed) {
         MailData mail = new MailData();

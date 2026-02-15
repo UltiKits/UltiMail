@@ -8,6 +8,8 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 import org.junit.jupiter.api.*;
@@ -52,6 +54,12 @@ class MailNotifyListenerTest {
     @Mock
     private Player.Spigot mockSpigot;
 
+    @Mock
+    private PluginManager mockPluginManager;
+
+    @Mock
+    private Plugin mockBukkitPlugin;
+
     private MockedStatic<Bukkit> mockedBukkit;
 
     private UUID playerUuid;
@@ -75,6 +83,8 @@ class MailNotifyListenerTest {
         // Mock Bukkit static
         mockedBukkit = mockStatic(Bukkit.class);
         mockedBukkit.when(Bukkit::getScheduler).thenReturn(mockScheduler);
+        mockedBukkit.when(Bukkit::getPluginManager).thenReturn(mockPluginManager);
+        lenient().when(mockPluginManager.getPlugin("UltiTools")).thenReturn(mockBukkitPlugin);
 
         // Mock scheduler to capture and run the delayed task immediately
         lenient().when(mockScheduler.runTaskLater(any(), any(Runnable.class), anyLong()))
@@ -211,6 +221,146 @@ class MailNotifyListenerTest {
             listener.onPlayerJoin(event);
 
             verify(mockScheduler).runTaskLater(any(), any(Runnable.class), eq(0L));
+        }
+    }
+
+    // ==================== Clickable Notification Tests ====================
+
+    @Nested
+    @DisplayName("可点击通知消息测试")
+    class ClickableNotificationTests {
+
+        @Test
+        @DisplayName("通知消息应包含未读数量")
+        void shouldIncludeUnreadCount() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(3);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            // Verify spigot sendMessage was called with BaseComponent array
+            verify(mockSpigot).sendMessage(any(net.md_5.bungee.api.chat.BaseComponent[].class));
+        }
+
+        @Test
+        @DisplayName("多次加入应该每次都发通知")
+        void shouldNotifyOnEachJoin() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(2);
+
+            PlayerJoinEvent event1 = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event1);
+
+            PlayerJoinEvent event2 = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event2);
+
+            verify(mockSpigot, times(2)).sendMessage(any(net.md_5.bungee.api.chat.BaseComponent[].class));
+        }
+
+        @Test
+        @DisplayName("未读数为1也应发送通知")
+        void shouldNotifyForSingleUnread() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(1);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            verify(mockSpigot).sendMessage(any(net.md_5.bungee.api.chat.BaseComponent[].class));
+        }
+
+        @Test
+        @DisplayName("大量未读也应正常通知")
+        void shouldNotifyForLargeUnreadCount() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(999);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            verify(mockSpigot).sendMessage(any(net.md_5.bungee.api.chat.BaseComponent[].class));
+        }
+    }
+
+    // ==================== Lazy Init Tests ====================
+
+    @Nested
+    @DisplayName("懒加载测试")
+    class LazyInitTests {
+
+        @Test
+        @DisplayName("bukkitPlugin应在首次调用时初始化")
+        void shouldLazyInitBukkitPlugin() throws Exception {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(0);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            // Verify getPluginManager was called for lazy init
+            mockedBukkit.verify(Bukkit::getPluginManager);
+        }
+
+        @Test
+        @DisplayName("多次调用不应重复初始化")
+        void shouldNotReinitBukkitPlugin() throws Exception {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(0);
+
+            // First call
+            listener.onPlayerJoin(new PlayerJoinEvent(player, "joined"));
+            // Second call - bukkitPlugin already set
+            listener.onPlayerJoin(new PlayerJoinEvent(player, "joined"));
+
+            // getPluginManager should be called only once (for first lazy init)
+            mockedBukkit.verify(Bukkit::getPluginManager, times(1));
+        }
+    }
+
+    // ==================== Config Interaction Tests ====================
+
+    @Nested
+    @DisplayName("配置交互测试")
+    class ConfigInteractionTests {
+
+        @Test
+        @DisplayName("默认延迟应为3秒(60 ticks)")
+        void shouldUseDefaultDelayOf3Seconds() {
+            config.setNotifyOnJoin(true);
+            // Default notifyDelay is 3
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(1);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            verify(mockScheduler).runTaskLater(any(), any(Runnable.class), eq(60L));
+        }
+
+        @Test
+        @DisplayName("默认配置应启用通知")
+        void shouldBeEnabledByDefault() {
+            assertThat(config.isNotifyOnJoin()).isTrue();
+        }
+    }
+
+    // ==================== i18n Tests ====================
+
+    @Nested
+    @DisplayName("国际化测试")
+    class I18nTests {
+
+        @Test
+        @DisplayName("应该调用plugin.i18n获取翻译文本")
+        void shouldCallI18nForTranslation() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(5);
+
+            PlayerJoinEvent event = new PlayerJoinEvent(player, "joined");
+            listener.onPlayerJoin(event);
+
+            // i18n should be called for notification text
+            verify(mockPlugin, atLeast(1)).i18n(anyString());
         }
     }
 

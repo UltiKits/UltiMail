@@ -279,4 +279,79 @@ class MailConfigTest {
             assertThat(config.getRecallEmailContent()).contains("{SENDER}");
         }
     }
+
+    @Nested
+    @DisplayName("Setter 测试")
+    class SetterTests {
+
+        @Test
+        @DisplayName("应该正确设置 mailExpireDays")
+        void shouldSetMailExpireDays() {
+            config.setMailExpireDays(60);
+            assertThat(config.getMailExpireDays()).isEqualTo(60);
+        }
+
+        @Test
+        @DisplayName("应该正确设置 newMailMessage")
+        void shouldSetNewMailMessage() {
+            config.setNewMailMessage("custom");
+            assertThat(config.getNewMailMessage()).isEqualTo("custom");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 mailSentMessage")
+        void shouldSetMailSentMessage() {
+            config.setMailSentMessage("sent msg");
+            assertThat(config.getMailSentMessage()).isEqualTo("sent msg");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 mailReceivedMessage")
+        void shouldSetMailReceivedMessage() {
+            config.setMailReceivedMessage("received");
+            assertThat(config.getMailReceivedMessage()).isEqualTo("received");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 serverName")
+        void shouldSetServerName() {
+            config.setServerName("MyServer");
+            assertThat(config.getServerName()).isEqualTo("MyServer");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 recallSubject")
+        void shouldSetRecallSubject() {
+            config.setRecallSubject("Recall Subject");
+            assertThat(config.getRecallSubject()).isEqualTo("Recall Subject");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 recallContent")
+        void shouldSetRecallContent() {
+            config.setRecallContent("Come back!");
+            assertThat(config.getRecallContent()).isEqualTo("Come back!");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 smtpFromEmail")
+        void shouldSetSmtpFromEmail() {
+            config.setSmtpFromEmail("from@test.com");
+            assertThat(config.getSmtpFromEmail()).isEqualTo("from@test.com");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 recallEmailSubject")
+        void shouldSetRecallEmailSubject() {
+            config.setRecallEmailSubject("Email Subject");
+            assertThat(config.getRecallEmailSubject()).isEqualTo("Email Subject");
+        }
+
+        @Test
+        @DisplayName("应该正确设置 recallEmailContent")
+        void shouldSetRecallEmailContent() {
+            config.setRecallEmailContent("Email Content");
+            assertThat(config.getRecallEmailContent()).isEqualTo("Email Content");
+        }
+    }
 }
