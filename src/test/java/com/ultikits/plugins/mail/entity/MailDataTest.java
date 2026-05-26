@@ -184,6 +184,13 @@ class MailDataTest {
     @DisplayName("equals 和 hashCode 测试")
     class EqualsHashCodeTests {
 
+        // Fixed timestamp used for equality assertions so the test does not depend on
+        // wall-clock alignment between two adjacent constructor calls. The no-arg
+        // MailData() constructor populates sentTime via System.currentTimeMillis(),
+        // and @EqualsAndHashCode(callSuper = true) includes sentTime in equality,
+        // which previously made createTestMail() flaky across millisecond boundaries.
+        private static final long FIXED_SENT_TIME_MILLIS = 1_700_000_000_000L;
+
         @Test
         @DisplayName("相同数据的两个对象应该相等")
         void shouldBeEqualWithSameData() {
@@ -269,6 +276,9 @@ class MailDataTest {
             mail.setReceiverName("receiver");
             mail.setSubject("subject");
             mail.setContent("content");
+            // Normalize sentTime so equality assertions across two adjacent
+            // constructor calls are deterministic regardless of wall-clock drift.
+            mail.setSentTime(FIXED_SENT_TIME_MILLIS);
             return mail;
         }
     }
