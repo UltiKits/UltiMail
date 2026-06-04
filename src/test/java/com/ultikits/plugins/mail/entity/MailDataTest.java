@@ -382,37 +382,24 @@ class MailDataTest {
     }
 
     @Nested
-    @DisplayName("默认ID生成测试")
+    @DisplayName("默认ID委托测试")
     class DefaultIdTests {
 
         @Test
-        @DisplayName("默认ID应该不为null")
-        void shouldHaveNonNullId() {
+        @DisplayName("默认构造函数不应提前生成ID")
+        void shouldLeaveIdNullBeforeInsert() {
             MailData mail = new MailData();
-            assertThat(mail.getId()).isNotNull();
+            assertThat(mail.getId()).isNull();
         }
 
         @Test
-        @DisplayName("默认ID应该基于时间戳")
-        void shouldHaveTimestampBasedId() {
-            long before = System.currentTimeMillis();
-            MailData mail = new MailData();
-            long after = System.currentTimeMillis();
-
-            long id = Long.parseLong(mail.getId());
-            assertThat(id).isBetween(before, after);
-        }
-
-        @Test
-        @DisplayName("两个实例的ID应该不同或相等(基于时间)")
-        void shouldGenerateUniqueIds() {
+        @DisplayName("多个新实例在插入前都应保持ID为空")
+        void shouldLeaveIdsNullForMultipleNewInstances() {
             MailData mail1 = new MailData();
             MailData mail2 = new MailData();
 
-            // IDs are timestamp-based, so they should be different if created at different ms
-            // or equal if created at the same ms
-            assertThat(mail1.getId()).isNotNull();
-            assertThat(mail2.getId()).isNotNull();
+            assertThat(mail1.getId()).isNull();
+            assertThat(mail2.getId()).isNull();
         }
     }
 
