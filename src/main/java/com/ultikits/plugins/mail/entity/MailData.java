@@ -76,8 +76,6 @@ public class MailData extends BaseDataEntity<String> {
     private boolean deletedByReceiver;
     
     public MailData() {
-        // Generate timestamp-based ID
-        this.setId(String.valueOf(System.currentTimeMillis()));
         this.sentTime = System.currentTimeMillis();
         this.read = false;
         this.claimed = false;
