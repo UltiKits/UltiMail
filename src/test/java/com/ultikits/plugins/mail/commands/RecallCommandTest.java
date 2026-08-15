@@ -630,7 +630,14 @@ class RecallCommandTest {
 
             assertThat(results[0]).isEqualTo(2); // total
             assertThat(results[1]).isEqualTo(2); // gameMails
-            verify(mailOp, times(2)).insert(any(MailData.class));
+            ArgumentCaptor<MailData> mailCaptor = ArgumentCaptor.forClass(MailData.class);
+            verify(mailOp, times(2)).insert(mailCaptor.capture());
+            assertThat(mailCaptor.getAllValues())
+                .hasSize(2)
+                .allSatisfy(mail -> assertThat(mail.getId()).isNull());
+            assertThat(mailCaptor.getAllValues())
+                .extracting(MailData::getReceiverUuid)
+                .containsExactlyInAnyOrder(uuid1.toString(), uuid2.toString());
         }
 
         @Test
