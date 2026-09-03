@@ -3,26 +3,37 @@ package com.ultikits.plugins.mail.commands;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.command.CmdMapping;
 import com.ultikits.plugins.mail.config.MailConfig;
+import com.ultikits.plugins.mail.gui.AttachmentSelectorPage;
 import com.ultikits.plugins.mail.service.MailService;
 import com.ultikits.plugins.mail.utils.TestHelper;
 
 import org.bukkit.Material;
+import org.bukkit.Server;
 import org.bukkit.command.CommandSender;
 import org.bukkit.conversations.Conversation;
+import org.bukkit.conversations.ConversationAbandonedEvent;
+import org.bukkit.conversations.ConversationCanceller;
 import org.bukkit.conversations.ConversationFactory;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -53,6 +64,15 @@ class SendMailCommandTest {
     @Mock
     private PlayerInventory senderInventory;
 
+    @Mock
+    private Server mockServer;
+
+    @Mock
+    private BukkitScheduler mockScheduler;
+
+    @Mock
+    private BukkitTask mockTask;
+
     private UUID senderUuid;
 
     @BeforeEach
@@ -65,6 +85,18 @@ class SendMailCommandTest {
         lenient().when(sender.getName()).thenReturn("SenderPlayer");
         lenient().when(sender.getInventory()).thenReturn(senderInventory);
         lenient().when(sender.isOnline()).thenReturn(true);
+
+        // Conversation.begin()/ConversationFactory.buildConversation() reach into
+        // plugin.getServer().getScheduler() to arm the inactivity canceller's timeout
+        // task -- a real Bukkit code path, not something SendMailCommand itself calls.
+        // Without these, buildConversation() throws a bare NullPointerException before
+        // any command-level behaviour can be observed.
+        lenient().when(mockPlugin.getServer()).thenReturn(mockServer);
+        lenient().when(mockServer.getScheduler()).thenReturn(mockScheduler);
+        lenient().when(mockScheduler.scheduleSyncDelayedTask(any(), any(Runnable.class), anyLong()))
+            .thenReturn(1);
+        lenient().when(mockScheduler.runTaskLater(any(), any(Runnable.class), anyLong()))
+            .thenReturn(mockTask);
 
         // Create command and inject dependencies
         command = new SendMailCommand(mockMailService, mockPlugin);
@@ -114,6 +146,99 @@ class SendMailCommandTest {
             }
 
             verify(senderInventory).setItemInMainHand(null);
+        }
+    }
+
+    // ==================== admin attachment-selector callback Tests ====================
+
+    @Nested
+    @DisplayName("管理员附件选择回调测试")
+    class AdminAttachmentCallbackTests {
+
+        // AttachmentSelectorPage is a `gui`-package class excluded from the coverage
+        // gate (D-07) and genuinely cannot be constructed here -- its base class
+        // needs a live obliviate-invs InventoryAPI/Bukkit inventory, which this
+        // module's own AttachmentSelectorPageTest can only exercise under
+        // MockBukkit, currently @Disabled for a Java 21/Paper API compatibility
+        // reason unrelated to this plan. What IS in scope and in this class (not
+        // AttachmentSelectorPage's own gui/ code) is the pair of callback lambdas
+        // `sendMailWithItems` builds and hands to that constructor. mockConstruction
+        // replaces the constructor with a no-op mock and hands back the exact
+        // arguments passed to it -- including those two lambdas -- so their bodies
+        // can be invoked and pinned directly without ever running a line of the
+        // excluded GUI class itself.
+        private List<Object> capturedArgs;
+
+        private void openAdminAttachmentSelector() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(true);
+            capturedArgs = new ArrayList<>();
+            try (MockedConstruction<AttachmentSelectorPage> mocked = mockConstruction(
+                    AttachmentSelectorPage.class,
+                    (mock, context) -> capturedArgs.addAll(context.arguments()))) {
+                command.sendMailWithItems(sender, "receiver", "subject");
+                assertThat(mocked.constructed()).hasSize(1);
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private Consumer<ItemStack[]> onConfirmCallback() {
+            return (Consumer<ItemStack[]>) capturedArgs.get(3);
+        }
+
+        private Runnable onCancelCallback() {
+            return (Runnable) capturedArgs.get(4);
+        }
+
+        @Test
+        @DisplayName("未选择物品(null)时应无附件发送")
+        void shouldSendWithoutAttachmentWhenItemsNull() {
+            openAdminAttachmentSelector();
+
+            onConfirmCallback().accept(null);
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            assertThat(captor.getValue().getContext().getSessionData("attachItems")).isNull();
+        }
+
+        @Test
+        @DisplayName("全部为空气方块的选择应视为无附件")
+        void shouldSendWithoutAttachmentWhenAllItemsAreAir() {
+            openAdminAttachmentSelector();
+
+            ItemStack air = mock(ItemStack.class);
+            when(air.getType()).thenReturn(Material.AIR);
+            onConfirmCallback().accept(new ItemStack[]{air, null});
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            assertThat(captor.getValue().getContext().getSessionData("attachItems")).isNull();
+        }
+
+        @Test
+        @DisplayName("选择了有效物品时应以附件启动会话")
+        void shouldSendWithValidAttachment() {
+            openAdminAttachmentSelector();
+
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            onConfirmCallback().accept(new ItemStack[]{diamond});
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            assertThat((ItemStack[]) captor.getValue().getContext().getSessionData("attachItems"))
+                .containsExactly(diamond);
+        }
+
+        @Test
+        @DisplayName("取消选择时应显示已取消消息")
+        void shouldShowCancelledMessageWhenCancelled() {
+            openAdminAttachmentSelector();
+
+            onCancelCallback().run();
+
+            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_cancelled]")));
         }
     }
 
@@ -656,6 +781,126 @@ class SendMailCommandTest {
             Method method = SendMailCommand.class.getDeclaredMethod(
                 "startContentConversation", Player.class, String.class, String.class, ItemStack[].class);
             assertThat(method).isNotNull();
+        }
+
+        @Test
+        @DisplayName("普通玩家携带物品时应以附件启动会话")
+        void shouldStartConversationWithAttachedItemForRegularPlayer() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            ItemStack clonedDiamond = mock(ItemStack.class);
+            when(diamond.clone()).thenReturn(clonedDiamond);
+            when(senderInventory.getItemInMainHand()).thenReturn(diamond);
+
+            command.sendMailWithItems(sender, "receiver", "subject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            ItemStack[] attached = (ItemStack[]) conversation.getContext().getSessionData("attachItems");
+            assertThat(attached).containsExactly(clonedDiamond);
+            assertThat(conversation.getContext().getSessionData("mailService")).isSameAs(mockMailService);
+        }
+
+        @Test
+        @DisplayName("会话被非正常放弃时应把未认领的附件归还玩家背包")
+        void shouldReturnUnclaimedItemsToInventoryWhenAbandonedUngracefully() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            ItemStack clonedDiamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            when(diamond.clone()).thenReturn(clonedDiamond);
+            when(clonedDiamond.getType()).thenReturn(Material.DIAMOND);
+            when(senderInventory.getItemInMainHand()).thenReturn(diamond);
+
+            command.sendMailWithItems(sender, "receiver", "subject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            ConversationCanceller canceller = mock(ConversationCanceller.class);
+            conversation.abandon(new ConversationAbandonedEvent(conversation, canceller));
+
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_cancelled]")));
+            verify(senderInventory).addItem(clonedDiamond);
+        }
+
+        @Test
+        @DisplayName("会话被正常放弃时不应归还附件")
+        void shouldNotReturnItemsWhenAbandonedGracefully() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            ItemStack clonedDiamond = mock(ItemStack.class);
+            when(diamond.clone()).thenReturn(clonedDiamond);
+            when(senderInventory.getItemInMainHand()).thenReturn(diamond);
+
+            command.sendMailWithItems(sender, "receiver", "subject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            // No canceller -> gracefulExit() is true -> the listener's early-return
+            // branch is taken and nothing is added back to the inventory.
+            conversation.abandon(new ConversationAbandonedEvent(conversation));
+
+            verify(senderInventory, never()).addItem(any(ItemStack.class));
+        }
+    }
+
+    // ==================== sendMail behaviour Tests ====================
+
+    @Nested
+    @DisplayName("sendMail 行为测试")
+    class SendMailBehaviorTests {
+
+        @Test
+        @DisplayName("应以邮件服务和插件会话数据启动会话")
+        void shouldBeginConversationWithSessionData() {
+            command.sendMail(sender, "ReceiverName", "TestSubject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            assertThat(conversation.getContext().getSessionData("mailService")).isSameAs(mockMailService);
+            assertThat(conversation.getContext().getSessionData("ultiPlugin")).isNotNull();
+        }
+
+        @Test
+        @DisplayName("会话被非正常放弃时应通知发送者已取消")
+        void shouldNotifySenderWhenAbandonedUngracefully() {
+            command.sendMail(sender, "ReceiverName", "TestSubject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            ConversationCanceller canceller = mock(ConversationCanceller.class);
+            conversation.abandon(new ConversationAbandonedEvent(conversation, canceller));
+
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_cancelled]")));
+        }
+
+        @Test
+        @DisplayName("会话被正常放弃时不应通知取消")
+        void shouldNotNotifyWhenAbandonedGracefully() {
+            command.sendMail(sender, "ReceiverName", "TestSubject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            conversation.abandon(new ConversationAbandonedEvent(conversation));
+
+            verify(sender, never()).sendRawMessage(any(String.class));
         }
     }
 }
