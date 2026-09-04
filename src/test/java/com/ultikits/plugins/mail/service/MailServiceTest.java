@@ -1226,6 +1226,26 @@ class MailServiceTest {
                 receiverUuid.toString().equals(mail.getReceiverUuid())
             ));
         }
+
+        @Test
+        @DisplayName("附件数超过maxItems时应拒绝发送且不入库")
+        void shouldRejectWhenItemCountExceedsMaxItems() {
+            // config.getMaxItems() defaults to 27 (MailConfig); one more than that
+            // makes createMailData() return null, which sendMailInternal reports as
+            // a plain "false" rather than an exception.
+            ItemStack[] tooMany = new ItemStack[config.getMaxItems() + 1];
+            for (int i = 0; i < tooMany.length; i++) {
+                ItemStack item = mock(ItemStack.class);
+                lenient().when(item.getType()).thenReturn(Material.DIAMOND);
+                tooMany[i] = item;
+            }
+
+            boolean result = mailService.sendMailInternal(
+                senderUuid, "SenderPlayer", "ReceiverPlayer", "标题", "内容", tooMany);
+
+            assertThat(result).isFalse();
+            verify(mockDataOperator, never()).insert(any(MailData.class));
+        }
     }
 
     // ==================== deleteMail edge cases ====================
@@ -1339,6 +1359,26 @@ class MailServiceTest {
 
             // Should not throw — caught by general catch(Exception)
             mailService.executeMailCommands(receiver, mail);
+        }
+
+        @Test
+        @DisplayName("解析后为空列表的commands不应执行也不应标记为已执行")
+        void shouldNotExecuteWhenParsedListIsEmpty() throws Exception {
+            // "[]" is deliberately excluded by MailData.hasCommands() itself (see its
+            // own !commands.equals("[]") check), so that string short-circuits BEFORE
+            // reaching executeMailCommands' try block at all -- it does not exercise
+            // the "commands != null but parses to an empty List" branch this pins.
+            // A single whitespace character keeps hasCommands() true while still
+            // parsing to an empty List via GSON.
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            mail.setCommands("[ ]");
+            assertThat(mail.hasCommands()).isTrue();
+
+            mailService.executeMailCommands(receiver, mail);
+
+            verify(receiver, never()).performCommand(anyString());
+            verify(mockDataOperator, never()).update(any(MailData.class));
+            assertThat(mail.isCommandsExecuted()).isFalse();
         }
     }
 
@@ -1681,6 +1721,48 @@ class MailServiceTest {
                 "Unknown".equals(mail.getReceiverName())
             ));
         }
+
+        @Test
+        @DisplayName("每处理50名玩家应发送一次进度消息")
+        void shouldSendProgressMessageEveryFiftyPlayers() {
+            // sendToAll's inner progress-notification BukkitRunnable (the "every 50
+            // players" callback) only fires once `sent` reaches a multiple of 50 --
+            // pin it directly rather than assuming the scheduling call alone proves
+            // the callback body runs, per the ArgumentCaptor<Runnable> idiom this
+            // module's TeleportService-equivalent scheduler tests already use.
+            OfflinePlayer[] offline = new OfflinePlayer[50];
+            for (int i = 0; i < offline.length; i++) {
+                UUID uuid = UUID.randomUUID();
+                OfflinePlayer player = mock(OfflinePlayer.class);
+                lenient().when(player.getUniqueId()).thenReturn(uuid);
+                lenient().when(player.getName()).thenReturn("Player" + i);
+                lenient().when(player.isOnline()).thenReturn(false);
+                offline[i] = player;
+            }
+            mockedBukkit.when(Bukkit::getOfflinePlayers).thenReturn(offline);
+
+            mailService.sendToAll(sender, "广播内容", null);
+
+            verify(mockDataOperator, times(50)).insert(any(MailData.class));
+            verify(sender, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[sendall_progress]")));
+        }
+
+        @Test
+        @DisplayName("玩家数不足50时不应发送进度消息")
+        void shouldNotSendProgressMessageBelowFifty() {
+            UUID otherUuid = UUID.randomUUID();
+            OfflinePlayer other = mock(OfflinePlayer.class);
+            when(other.getUniqueId()).thenReturn(otherUuid);
+            when(other.getName()).thenReturn("OtherPlayer");
+            when(other.isOnline()).thenReturn(false);
+            mockedBukkit.when(Bukkit::getOfflinePlayers).thenReturn(new OfflinePlayer[]{other});
+
+            mailService.sendToAll(sender, "广播内容", null);
+
+            verify(sender, never()).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[sendall_progress]")));
+        }
     }
 
     // ==================== init Tests ====================
@@ -1902,6 +1984,28 @@ class MailServiceTest {
             method.setAccessible(true);
 
             String result = (String) method.invoke(mailService, "NeverPlayed");
+
+            assertThat(result).isNull();
+        }
+    }
+
+    // ==================== serializeItems Tests ====================
+
+    @Nested
+    @DisplayName("serializeItems 方法测试")
+    class SerializeItemsTests {
+
+        @Test
+        @DisplayName("序列化失败时应返回null而不是抛出异常")
+        void shouldReturnNullWhenSerializationFails() throws Exception {
+            Method method = MailService.class.getDeclaredMethod("serializeItems", ItemStack[].class);
+            method.setAccessible(true);
+
+            // A null items array makes the method's own `items.length` NPE inside
+            // the try block -- the same catch(Exception) that guards a genuine I/O
+            // failure during a real write, pinned here without needing a real
+            // Bukkit server to produce one.
+            String result = (String) method.invoke(mailService, (Object) null);
 
             assertThat(result).isNull();
         }

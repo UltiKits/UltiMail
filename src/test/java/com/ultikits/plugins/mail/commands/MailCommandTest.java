@@ -3,6 +3,9 @@ package com.ultikits.plugins.mail.commands;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
+import com.ultikits.plugins.mail.gui.AttachmentSelectorPage;
+import com.ultikits.plugins.mail.gui.MailboxGUI;
+import com.ultikits.plugins.mail.gui.SentboxGUI;
 import com.ultikits.plugins.mail.service.MailService;
 import com.ultikits.plugins.mail.utils.TestHelper;
 
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.MockedConstruction;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
@@ -23,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -955,6 +960,124 @@ class MailCommandTest {
             mailCommand.deleteRead(player);
 
             verify(mockMailService).deleteReadByReceiver(playerUuid);
+        }
+    }
+
+    // ==================== GUI opener Tests ====================
+
+    @Nested
+    @DisplayName("GUI 打开命令测试")
+    class GuiOpenerTests {
+
+        // MailboxGUI/SentboxGUI are `gui`-package classes excluded from the coverage
+        // gate (D-07); their own construction needs a live obliviate-invs
+        // InventoryAPI, which this module cannot stand up outside MockBukkit.
+        // mockConstruction replaces the constructor with a no-op mock so the
+        // *calling* method here (openInboxGUI/openSentboxGUI, both plain MailCommand
+        // methods, not gui/ code) can be pinned: it constructs the right GUI class
+        // with the right arguments and opens it, without ever running a line of the
+        // excluded class itself.
+
+        @Test
+        @DisplayName("openInboxGUI 应构造并打开 MailboxGUI")
+        void shouldConstructAndOpenMailboxGui() {
+            try (MockedConstruction<MailboxGUI> mocked = mockConstruction(MailboxGUI.class)) {
+                mailCommand.openInboxGUI(player);
+
+                assertThat(mocked.constructed()).hasSize(1);
+                verify(mocked.constructed().get(0)).open();
+            }
+        }
+
+        @Test
+        @DisplayName("openSentboxGUI 应构造并打开 SentboxGUI")
+        void shouldConstructAndOpenSentboxGui() {
+            try (MockedConstruction<SentboxGUI> mocked = mockConstruction(SentboxGUI.class)) {
+                mailCommand.openSentboxGUI(player);
+
+                assertThat(mocked.constructed()).hasSize(1);
+                verify(mocked.constructed().get(0)).open();
+            }
+        }
+    }
+
+    // ==================== sendAllWithItems Tests ====================
+
+    @Nested
+    @DisplayName("sendAllWithItems 命令测试")
+    class SendAllWithItemsTests {
+
+        // Same mockConstruction technique as GuiOpenerTests: AttachmentSelectorPage
+        // is excluded gui/ code, so its constructor is replaced with a no-op mock
+        // and the two callback lambdas sendAllWithItems builds are captured and
+        // invoked directly to pin MailCommand's own dispatch logic.
+        private List<Object> capturedArgs;
+
+        private void openAdminAttachmentSelector() {
+            MailConfig mockConfig = mock(MailConfig.class);
+            when(mockConfig.getMaxItems()).thenReturn(27);
+            when(mockMailService.getConfig()).thenReturn(mockConfig);
+            capturedArgs = new ArrayList<>();
+            try (MockedConstruction<AttachmentSelectorPage> mocked = mockConstruction(
+                    AttachmentSelectorPage.class,
+                    (mock, context) -> capturedArgs.addAll(context.arguments()))) {
+                mailCommand.sendAllWithItems(player, "广播内容");
+                assertThat(mocked.constructed()).hasSize(1);
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private Consumer<ItemStack[]> onConfirmCallback() {
+            return (Consumer<ItemStack[]>) capturedArgs.get(3);
+        }
+
+        private Runnable onCancelCallback() {
+            return (Runnable) capturedArgs.get(4);
+        }
+
+        @Test
+        @DisplayName("选择了有效物品时应带附件群发并提示数量")
+        void shouldBroadcastWithAttachmentAndCountHint() {
+            openAdminAttachmentSelector();
+
+            ItemStack diamond = mock(ItemStack.class);
+            onConfirmCallback().accept(new ItemStack[]{diamond});
+
+            verify(mockMailService).sendToAll(player, "广播内容", new ItemStack[]{diamond});
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_attachment_added]")));
+        }
+
+        @Test
+        @DisplayName("未选择物品(null)时应无附件群发")
+        void shouldBroadcastWithoutAttachmentWhenItemsNull() {
+            openAdminAttachmentSelector();
+
+            onConfirmCallback().accept(null);
+
+            verify(mockMailService).sendToAll(player, "广播内容", null);
+        }
+
+        @Test
+        @DisplayName("选择了空物品数组时应无附件群发")
+        void shouldBroadcastWithoutAttachmentWhenItemsEmpty() {
+            openAdminAttachmentSelector();
+
+            onConfirmCallback().accept(new ItemStack[0]);
+
+            verify(mockMailService).sendToAll(player, "广播内容", null);
+        }
+
+        @Test
+        @DisplayName("取消选择时应显示已取消消息")
+        void shouldShowCancelledMessageWhenCancelled() {
+            openAdminAttachmentSelector();
+
+            onCancelCallback().run();
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_cancelled]")));
+            verify(mockMailService, never()).sendToAll(any(), anyString(), any());
         }
     }
 
