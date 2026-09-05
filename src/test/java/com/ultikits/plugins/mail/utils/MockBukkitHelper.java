@@ -1,6 +1,7 @@
 /**
  * Synced from UltiTools-API v6.2.0
  * Source: UltiEssentials test utilities
+ * Migrated onto org.mockbukkit.mockbukkit:mockbukkit-v1.21 during phase 14 (14-10).
  */
 package com.ultikits.plugins.mail.utils;
 
@@ -8,7 +9,7 @@ import java.lang.reflect.Field;
 
 import org.bukkit.Bukkit;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
  * MockBukkit 测试工具类
@@ -34,10 +35,14 @@ public final class MockBukkitHelper {
         }
 
         // 2. 强制清理 MockBukkit 的内部状态
+        // NOTE: the 1.21 generation's internal singleton field is `mock` (a ServerMock
+        // reference), not the legacy generation's `mocked` (a boolean) — confirmed via
+        // javap against the real 4.101.0 jar. Reflecting on the old name would silently
+        // clear nothing.
         try {
-            Field mockedField = MockBukkit.class.getDeclaredField("mocked");
-            mockedField.setAccessible(true);
-            mockedField.setBoolean(null, false);
+            Field mockField = MockBukkit.class.getDeclaredField("mock");
+            mockField.setAccessible(true);
+            mockField.set(null, null);
         } catch (Exception ignored) {
         }
 
@@ -61,7 +66,7 @@ public final class MockBukkitHelper {
             MockBukkit.unmock();
         } catch (Exception ignored) {
         }
-        
+
         // 确保完全清理
         ensureCleanState();
     }

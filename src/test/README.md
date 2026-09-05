@@ -6,30 +6,23 @@ UltiMail 插件包含全面的单元测试，覆盖实体、配置、服务、GU
 
 ### 测试统计
 
-| 类别 | 测试类 | 测试数 | 状态 |
-|------|--------|--------|------|
-| 实体 | `MailDataTest` | 16 | ✅ 通过 |
-| 配置 | `MailConfigTest` | 29 | ✅ 通过 |
-| 服务 | `MailServiceTest` | 11 | ⏸️ 跳过* |
-| GUI | `MailboxGUITest` | 3 | ⏸️ 跳过* |
-| GUI | `SentboxGUITest` | 3 | ⏸️ 跳过* |
-| GUI | `AttachmentSelectorPageTest` | 5 | ⏸️ 跳过* |
-| 监听器 | `MailNotifyListenerTest` | 5 | ⏸️ 跳过* |
-| 命令 | `MailCommandTest` | 8 | ⏸️ 跳过* |
-| 命令 | `SendMailCommandTest` | 7 | ⏸️ 跳过* |
-
-## 总计: 87 个测试 (45 通过, 42 跳过)
-
-> *注: 需要 MockBukkit 的测试由于 Java 21 + Paper API 1.19 兼容性问题暂时跳过。
+| 类别 | 测试类 | 状态 |
+|------|--------|------|
+| 实体 | `MailDataTest` | ✅ 通过 |
+| 配置 | `MailConfigTest` | ✅ 通过 |
+| 服务 | `MailServiceTest` | ✅ 通过 |
+| GUI | `MailboxGUITest` | ✅ 通过 |
+| GUI | `SentboxGUITest` | ✅ 通过 |
+| GUI | `AttachmentSelectorPageTest` | ✅ 通过 |
+| 监听器 | `MailNotifyListenerTest` | ✅ 通过 |
+| 命令 | `MailCommandTest` | ✅ 通过 |
+| 命令 | `SendMailCommandTest` | ✅ 通过 |
 
 ## 运行测试
 
 ```bash
 # 运行所有测试
 mvn test
-
-# 只运行通过的测试
-mvn test -Dtest=MailDataTest,MailConfigTest
 
 # 运行单个测试类
 mvn test -Dtest=MailDataTest
@@ -38,7 +31,7 @@ mvn test -Dtest=MailDataTest
 ## 测试框架
 
 - **JUnit 5** (5.10.1) - 测试框架
-- **MockBukkit** (3.1.0) - Bukkit API 模拟 (受限制)
+- **MockBukkit** (`org.mockbukkit.mockbukkit:mockbukkit-v1.21`, 4.101.0) - Bukkit/Paper 测试服务器模拟
 - **Mockito** (5.5.0) - 通用模拟
 - **AssertJ** (3.24.2) - 流畅断言
 
@@ -46,6 +39,7 @@ mvn test -Dtest=MailDataTest
 
 ```
 src/test/java/com/ultikits/plugins/mail/
+├── UltiMailRegistrySentinelTest.java  # 回归防护哨兵：确认测试仍能到达真实 Bukkit 注册表
 ├── utils/
 │   ├── MockBukkitHelper.java    # MockBukkit 清理工具
 │   └── TestHelper.java          # Mock 实例创建助手
@@ -54,16 +48,16 @@ src/test/java/com/ultikits/plugins/mail/
 ├── config/
 │   └── MailConfigTest.java      # 配置实体测试
 ├── service/
-│   └── MailServiceTest.java     # 邮件服务测试 [需 MockBukkit]
+│   └── MailServiceTest.java     # 邮件服务测试
 ├── gui/
-│   ├── MailboxGUITest.java      # 收件箱 GUI 测试 [需 MockBukkit]
-│   ├── SentboxGUITest.java      # 发件箱 GUI 测试 [需 MockBukkit]
-│   └── AttachmentSelectorPageTest.java  # 附件选择页测试 [需 MockBukkit]
+│   ├── MailboxGUITest.java      # 收件箱 GUI 测试
+│   ├── SentboxGUITest.java      # 发件箱 GUI 测试
+│   └── AttachmentSelectorPageTest.java  # 附件选择页测试
 ├── listener/
-│   └── MailNotifyListenerTest.java   # 通知监听器测试 [需 MockBukkit]
+│   └── MailNotifyListenerTest.java   # 通知监听器测试
 └── commands/
-    ├── MailCommandTest.java     # /mail 命令测试 [需 MockBukkit]
-    └── SendMailCommandTest.java # /sendmail 命令测试 [需 MockBukkit]
+    ├── MailCommandTest.java     # /mail 命令测试
+    └── SendMailCommandTest.java # /sendmail 命令测试
 ```
 
 ## 测试覆盖范围
@@ -83,19 +77,33 @@ src/test/java/com/ultikits/plugins/mail/
 - 消息占位符测试
 - 邮件 SMTP 配置测试
 
-## MockBukkit 兼容性问题
+## MockBukkit 迁移历史（2026-09，Phase 14）
 
-由于以下问题，部分测试暂时被 `@Disabled`:
+`AttachmentSelectorPageTest`、`MailboxGUITest`、`SentboxGUITest` 曾长期携带
+`@Disabled("MockBukkit 与 Java 21 + Paper API 存在兼容性问题，待修复")`，且从未真正运行过。
 
-1. **Java 21 兼容性**: MockBukkit 3.1.0 在 Java 21 环境下可能无法正确实例化插件
-2. **Paper API 版本**: Paper API 1.19 与 MockBukkit 存在类加载器冲突
-3. **PluginClassLoader 要求**: Bukkit `JavaPlugin` 需要特殊的类加载器
+**实际根因已用字节码确认，并非笼统的"Java 21 兼容性问题"：** 旧依赖
+`com.github.seeseemelk:MockBukkit-v1.19:3.1.0` 编译期调用的是
+`org.bukkit.command.SimpleCommandMap` 的单参数构造函数
+`SimpleCommandMap(Server)`；Paper 1.21 的 `paper-api` 只保留了双参数构造函数
+`SimpleCommandMap(Server, Map<String, Command>)`，二者是二进制不兼容关系。移除
+`@Disabled` 后单独运行 `AttachmentSelectorPageTest`，全部用例均在
+`MockBukkit.mock()` 自身抛出的
+`NoSuchMethodError: 'void org.bukkit.command.SimpleCommandMap.<init>(org.bukkit.Server)'`
+处失败，尚未触及任何注册表相关代码。
 
-### 解决方案（待实施）
+`SendMailCommandTest` 中的 8 个用例则是另一类问题：经由
+`Material.isAir -> Material.asBlockType` 触达 Bukkit 注册表，在没有真实测试期服务器的情况下抛出
+`IllegalStateException: No RegistryAccess implementation found`。
 
-1. 升级 MockBukkit 版本（如果有更新的兼容版本）
-2. 使用纯 Mockito 重写需要 Bukkit 环境的测试
-3. 等待 MockBukkit 的 Java 21 支持更新
+**解决方式：** 将 MockBukkit 从 `com.github.seeseemelk:MockBukkit-v1.19:3.1.0` 迁移到框架自身已在使用的
+`org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.101.0`（同时移除仅为该旧依赖存在的 `jitpack.io`
+仓库配置）。迁移后三个 GUI 测试类的 `@Disabled` 被移除并全部通过；
+`SendMailCommandTest` 的 8 个用例通过引导真实的 MockBukkit 测试服务器解决。
+`UltiMailRegistrySentinelTest` 作为回归防护：如果测试服务器引导被静默移除，
+该哨兵会失败，防止此类问题再次悄悄重现。
+
+详见 `/home/wisdomme/servers/evidence/phase-14/14-LEDGER-UltiMail.md`（本地证据文件，未纳入版本控制）。
 
 ## 贡献指南
 
@@ -103,6 +111,6 @@ src/test/java/com/ultikits/plugins/mail/
 
 1. 使用 `@DisplayName` 提供中文测试描述
 2. 使用 `@Nested` 类组织相关测试
-3. 避免使用 MockBukkit 除非绝对必要
-4. 优先使用纯 Mockito 进行模拟
+3. 仅在测试确实需要真实的 Bukkit/Paper 行为（注册表、命令分发、事件等）时才引导 MockBukkit
+4. 不需要真实 Bukkit 环境的逻辑优先使用纯 Mockito 进行模拟
 5. 使用 AssertJ 的流畅断言风格
