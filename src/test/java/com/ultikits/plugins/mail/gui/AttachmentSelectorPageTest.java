@@ -24,13 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for AttachmentSelectorPage.
  * <p>
  * 附件选择 GUI 单元测试。
- * <p>
- * 注意: 需要 MockBukkit，由于 Java 21 + Paper API 兼容性问题暂时禁用。
  */
 @DisplayName("AttachmentSelectorPage 测试")
 @ExtendWith(MockitoExtension.class)
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Disabled("MockBukkit 与 Java 21 + Paper API 存在兼容性问题，待修复")
 class AttachmentSelectorPageTest {
 
     private PlayerMock player;
