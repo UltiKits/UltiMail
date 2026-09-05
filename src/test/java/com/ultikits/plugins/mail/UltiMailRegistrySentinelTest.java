@@ -3,7 +3,10 @@ package com.ultikits.plugins.mail;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 import java.util.UUID;
 
@@ -16,11 +19,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Every assertion here depends on a live server instance, never a bare registry constant —
  * {@code mockbukkit-v1.21} registers its {@code RegistryAccess} mock via
  * {@code java.util.ServiceLoader}, so registry constants resolve merely from the dependency being
- * on the classpath, independent of whether {@link org.mockbukkit.mockbukkit.MockBukkit#mock()} was
+ * on the classpath, independent of whether {@link MockBukkit#mock()} was
  * ever called. If this class is ever authored to assert only a bare constant, it stops being able
  * to detect the bootstrap being silently removed.
  */
 public class UltiMailRegistrySentinelTest {
+
+    @BeforeEach
+    void setUp() {
+        MockBukkit.mock();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
 
     @Test
     void liveServerIsBootstrapped() {
