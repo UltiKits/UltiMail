@@ -1152,7 +1152,7 @@ class MailServiceTest {
             mailService.sendMail(sender, "ReceiverPlayer", "标题2", "内容2", null);
 
             // Second send should show cooldown msg
-            verify(sender, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender, atLeast(1)).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_cooldown]")
             ));
         }
@@ -1163,7 +1163,7 @@ class MailServiceTest {
             String longSubject = String.join("", Collections.nCopies(100, "a"));
             mailService.sendMail(sender, "ReceiverPlayer", longSubject, "内容", null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_subject_too_long]")
             ));
         }
@@ -1174,7 +1174,7 @@ class MailServiceTest {
             String longContent = String.join("", Collections.nCopies(1000, "a"));
             mailService.sendMail(sender, "ReceiverPlayer", "标题", longContent, null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_content_too_long]")
             ));
         }
@@ -1190,7 +1190,7 @@ class MailServiceTest {
 
             mailService.sendMail(sender, "ghost", "标题", "内容", null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_player_not_found]")
             ));
         }
@@ -2248,7 +2248,7 @@ class MailServiceTest {
             boolean result = mailService.sendMail(sender, "ReceiverPlayer", "标题", "内容", items);
 
             assertThat(result).isFalse();
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_items_too_many]")
             ));
             verify(mockDataOperator, never()).insert(any());

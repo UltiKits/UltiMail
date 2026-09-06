@@ -97,22 +97,27 @@ public class MailService {
      * @param commands Commands to execute when read (can be null)
      * @return true if sent successfully
      */
-    public boolean sendMail(Player sender, String receiverName, String subject, String content, 
+    public boolean sendMail(Player sender, String receiverName, String subject, String content,
                            ItemStack[] items, List<String> commands) {
+        // Every refusal below uses sendRawMessage rather than sendMessage: this method is called
+        // from SendMailCommand.ContentPrompt.acceptInput while sender is still inside a modal
+        // Bukkit conversation, and Player#sendMessage is a documented no-op in that state (only
+        // sendRawMessage always delivers). Unconditional for every caller, not just the
+        // conversation one: outside a conversation the two are behaviourally identical.
         // Check cooldown
         if (isOnCooldown(sender.getUniqueId())) {
-            sender.sendMessage(ChatColor.RED + i18n("send_cooldown"));
+            sender.sendRawMessage(ChatColor.RED + i18n("send_cooldown"));
             return false;
         }
         
         // Validate subject and content
         if (subject.length() > config.getMaxSubjectLength()) {
-            sender.sendMessage(ChatColor.RED + i18n("send_subject_too_long")
+            sender.sendRawMessage(ChatColor.RED + i18n("send_subject_too_long")
                 .replace("{0}", String.valueOf(config.getMaxSubjectLength())));
             return false;
         }
         if (content.length() > config.getMaxContentLength()) {
-            sender.sendMessage(ChatColor.RED + i18n("send_content_too_long")
+            sender.sendRawMessage(ChatColor.RED + i18n("send_content_too_long")
                 .replace("{0}", String.valueOf(config.getMaxContentLength())));
             return false;
         }
@@ -120,7 +125,7 @@ public class MailService {
         // Get receiver UUID (may be offline)
         String receiverUuid = getPlayerUuid(receiverName);
         if (receiverUuid == null) {
-            sender.sendMessage(ChatColor.RED + i18n("send_player_not_found")
+            sender.sendRawMessage(ChatColor.RED + i18n("send_player_not_found")
                 .replace("{0}", receiverName));
             return false;
         }
@@ -130,7 +135,7 @@ public class MailService {
             receiverUuid, receiverName, subject, content, items, commands);
         
         if (mail == null) {
-            sender.sendMessage(ChatColor.RED + i18n("send_items_too_many")
+            sender.sendRawMessage(ChatColor.RED + i18n("send_items_too_many")
                 .replace("{0}", String.valueOf(config.getMaxItems())));
             return false;
         }

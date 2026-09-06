@@ -192,10 +192,17 @@ public class SendMailCommand extends BaseCommandExecutor {
             boolean success = service.sendMail(sender, receiver, subject, input, items);
 
             if (success) {
+                // sendMessage(...) is a documented no-op while the player is still inside this
+                // modal conversation (acceptInput runs before Prompt.END_OF_CONVERSATION is
+                // processed) -- matching the abandonment listener's own use of sendRawMessage
+                // above and in startContentConversation, and required here for the same reason.
                 String msg = p.i18n("mail_sent_success")
                     .replace("{RECEIVER}", receiver);
-                sender.sendMessage(ChatColor.GREEN + msg);
+                sender.sendRawMessage(ChatColor.GREEN + msg);
             }
+            // A false return has already messaged the sender exactly once, from inside
+            // MailService.sendMail(...) -- no further message belongs here, or the player would
+            // see two lines for a single refusal.
 
             return Prompt.END_OF_CONVERSATION;
         }
