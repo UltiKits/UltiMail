@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 
+import com.ultikits.plugins.mail.utils.MockBukkitHelper;
+
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,17 +24,25 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * on the classpath, independent of whether {@link MockBukkit#mock()} was
  * ever called. If this class is ever authored to assert only a bare constant, it stops being able
  * to detect the bootstrap being silently removed.
+ * <br>
+ * This class deliberately does <b>not</b> call {@link MockBukkit#mock()} itself. Doing so would let
+ * the module's shared test-time bootstrap ({@link MockBukkitHelper#bootstrapServer()}) be removed or
+ * replaced (e.g. with a bare Mockito {@code Server} mock) without this sentinel ever noticing — it
+ * would simply keep standing up its own unrelated live server. Routing through the same shared entry
+ * point every other MockBukkit-backed test in this module uses ({@code AttachmentSelectorPageTest},
+ * {@code MailboxGUITest}, {@code SentboxGUITest}) is what makes this a guard on the module's actual
+ * wiring, not on this file's own private copy of it.
  */
 public class UltiMailRegistrySentinelTest {
 
     @BeforeEach
     void setUp() {
-        MockBukkit.mock();
+        MockBukkitHelper.bootstrapServer();
     }
 
     @AfterEach
     void tearDown() {
-        MockBukkit.unmock();
+        MockBukkitHelper.safeUnmock();
     }
 
     @Test

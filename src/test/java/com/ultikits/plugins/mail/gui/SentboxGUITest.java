@@ -1,6 +1,5 @@
 package com.ultikits.plugins.mail.gui;
 
-import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
@@ -39,9 +38,7 @@ class SentboxGUITest {
 
     @BeforeEach
     void setUp() {
-        MockBukkitHelper.ensureCleanState();
-        ServerMock server = MockBukkit.mock();
-        MockBukkit.createMockPlugin();
+        ServerMock server = MockBukkitHelper.bootstrapServer();
 
         // Setup mock UltiToolsPlugin
         TestHelper.mockUltiToolsPlugin();

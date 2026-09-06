@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import org.bukkit.Bukkit;
 
 import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
 
 /**
  * MockBukkit 测试工具类
@@ -19,6 +20,26 @@ public final class MockBukkitHelper {
 
     private MockBukkitHelper() {
         // 工具类不允许实例化
+    }
+
+    /**
+     * The module's single, shared test-time live-server bootstrap.
+     * <p>
+     * Every test that needs a real MockBukkit-backed {@code Server} — including the reopen-guard
+     * sentinel ({@code UltiMailRegistrySentinelTest}) — must call this method rather than invoking
+     * {@link MockBukkit#mock()} directly. Centralizing the call here is what lets the sentinel
+     * actually detect a regression: if this method is ever changed to skip {@link MockBukkit#mock()}
+     * (e.g. rewritten to install a bare Mockito {@code Server} mock instead), every caller —
+     * including the sentinel — observes the same broken bootstrap, rather than the sentinel silently
+     * continuing to pass on a live server it stood up independently.
+     *
+     * @return the live {@link ServerMock} instance, for callers that need to add players/plugins
+     */
+    public static ServerMock bootstrapServer() {
+        ensureCleanState();
+        ServerMock server = MockBukkit.mock();
+        MockBukkit.createMockPlugin();
+        return server;
     }
 
     /**
