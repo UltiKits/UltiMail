@@ -11,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
@@ -27,6 +28,7 @@ import org.mockbukkit.mockbukkit.plugin.PluginMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,9 +91,18 @@ class AttachmentSelectorPageTest {
      * (top) inventory, using the player's real, just-opened {@link InventoryView}.
      */
     private InventoryClickEvent topInventoryClickEvent(int rawSlot) {
+        return topInventoryClickEvent(rawSlot, ClickType.LEFT, InventoryAction.PLACE_ALL);
+    }
+
+    /**
+     * Same as {@link #topInventoryClickEvent(int)}, but for a specific {@link ClickType}/
+     * {@link InventoryAction} pair -- used to prove that {@link AttachmentSelectorPage#onClick}'s
+     * (and the library's toolbar-protection default's) behaviour does not depend on which one was
+     * used to trigger the click, per WR-01.
+     */
+    private InventoryClickEvent topInventoryClickEvent(int rawSlot, ClickType clickType, InventoryAction action) {
         InventoryView view = player.getOpenInventory();
-        return new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, rawSlot,
-                ClickType.LEFT, InventoryAction.PLACE_ALL);
+        return new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, rawSlot, clickType, action);
     }
 
     /**
@@ -206,6 +217,63 @@ class AttachmentSelectorPageTest {
                 .isNotNull();
         assertThat(Arrays.stream(receivedItems.get()).anyMatch(i -> i.getType() == Material.DIAMOND))
                 .as("the diamond placed into the content area must reach the attachment set")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("经工具栏的位移点击（shift-click）仍应保持取消")
+    void shiftClickOnToolbarSlotStaysCancelled() {
+        InventoryClickEvent event = topInventoryClickEvent(okButtonSlot(),
+                ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        fireClickTolerantOfKnownCloseIncompatibility(event);
+
+        // InvListener's toolbar-protection branch (verified by bytecode disassembly, see this
+        // class's javadoc and AttachmentSelectorPage.onClick's own javadoc) gates purely on
+        // getSlot() == getRawSlot() -- it never inspects InventoryAction -- so a shift-click into
+        // the toolbar must stay cancelled exactly like the plain left-click the other toolbar
+        // tests use.
+        assertThat(event.isCancelled())
+                .as("the toolbar slot must stay protected regardless of click type")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("数字键快捷栏交换（hotbar-swap）在附件槽位应该被接受")
+    void numberKeyHotbarSwapOnContentSlotIsAccepted() {
+        int slot = 15; // inside the 0-44 content area
+
+        InventoryClickEvent event = topInventoryClickEvent(slot,
+                ClickType.NUMBER_KEY, InventoryAction.HOTBAR_SWAP);
+        Bukkit.getPluginManager().callEvent(event);
+
+        // AttachmentSelectorPage.onClick reports "handled" for any raw slot inside the content
+        // area purely by slot range, regardless of InventoryAction, so a number-key hotbar swap
+        // must be let through exactly like the plain left-click the placement test above uses.
+        assertThat(event.isCancelled())
+                .as("a hotbar-swap placement in the attachment slots must not be cancelled")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("拖拽放置到附件槽位仍会被取消（未修复的已知限制）")
+    void dragPlacementIntoContentAreaStillCancelled() {
+        int slot = 5; // inside the 0-44 content area
+        ItemStack diamond = new ItemStack(Material.DIAMOND);
+
+        InventoryDragEvent event = new InventoryDragEvent(player.getOpenInventory(),
+                null, diamond, false, Collections.singletonMap(slot, diamond));
+
+        Bukkit.getPluginManager().callEvent(event);
+
+        // Gui.onDrag(InventoryDragEvent) defaults to `return false`, and AttachmentSelectorPage
+        // does not override it (unlike onClick), so InvListener's own default cancellation for an
+        // unhandled drag into the top inventory still applies -- a real mouse-drag placement
+        // remains fully blocked, exactly as before this PR's fix. This is the behaviour WR-03
+        // documents: the class javadoc's former "players can drag items into the GUI" claim was
+        // inaccurate, and this test locks in the actual (unfixed) limitation rather than the
+        // aspirational one.
+        assertThat(event.isCancelled())
+                .as("drag-placement into the content area is not supported and must stay cancelled")
                 .isTrue();
     }
 }
