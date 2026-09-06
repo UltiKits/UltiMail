@@ -19,7 +19,10 @@ import java.util.function.Consumer;
 /**
  * GUI for selecting multiple attachments.
  * <p>
- * Players can drag items into the GUI to add them as attachments.
+ * Players can click to place items into the GUI to add them as attachments. Drag-placement is
+ * not supported: {@code Gui.onDrag(InventoryDragEvent)} defaults to cancelling any drag into this
+ * page's own top inventory, and this class does not override it (see {@link #onClick} for the
+ * click-side override that does exist).
  * This is only available for admins with ultimail.admin.sendall permission.
  *
  * @author wisdomme
