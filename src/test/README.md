@@ -103,8 +103,6 @@ src/test/java/com/ultikits/plugins/mail/
 `UltiMailRegistrySentinelTest` 作为回归防护：如果测试服务器引导被静默移除，
 该哨兵会失败，防止此类问题再次悄悄重现。
 
-详见 `/home/wisdomme/servers/evidence/phase-14/14-LEDGER-UltiMail.md`（本地证据文件，未纳入版本控制）。
-
 ## 贡献指南
 
 添加新测试时请遵循以下原则：
