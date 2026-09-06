@@ -199,10 +199,22 @@ public class SendMailCommand extends BaseCommandExecutor {
                 String msg = p.i18n("mail_sent_success")
                     .replace("{RECEIVER}", receiver);
                 sender.sendRawMessage(ChatColor.GREEN + msg);
+            } else if (items != null) {
+                // A false return has already messaged the sender exactly once, from inside
+                // MailService.sendMail(...) -- but none of its five refusal branches (cooldown,
+                // subject/content too long, unknown receiver, too many items) ever touch `items`.
+                // This conversation ends here regardless (END_OF_CONVERSATION below), so if we
+                // don't give the items back now, they are gone for good -- this is the last point
+                // that still holds a reference to them. The GUI attachment path defaults to 45
+                // selectable slots while MailConfig.maxItems defaults to 27, so selecting
+                // 28-45 items is guaranteed to hit the "too many items" refusal and previously
+                // destroyed every selected item silently.
+                for (ItemStack item : items) {
+                    if (item != null && !item.getType().isAir()) {
+                        sender.getInventory().addItem(item);
+                    }
+                }
             }
-            // A false return has already messaged the sender exactly once, from inside
-            // MailService.sendMail(...) -- no further message belongs here, or the player would
-            // see two lines for a single refusal.
 
             return Prompt.END_OF_CONVERSATION;
         }
