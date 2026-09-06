@@ -116,8 +116,12 @@ ServiceLoader 提供者，与「有没有引导真实测试期服务器」无关
 
 - **注册表常量解析**——`Material.X`、`Sound.X`、`InventoryType.X`、`PotionEffectType.X`
   能否解析、其类初始化能否成功——来自 classpath 上的 ServiceLoader 提供者，**不需要真实服务器**。
-- **物品构造**——`new ItemStack(Material.X)`、真实的 `ItemMeta`——**需要**真实服务器，
-  因为 `Material.asItemType()` 要经过 `Bukkit.getUnsafe()`。
+- **物品构造**——`new ItemStack(Material.X)`、真实的 `ItemMeta`——**需要**真实服务器。
+  机制取自 `paper-api-1.21.11` 字节码：`Material.asItemType()` 调用其 `itemType` supplier，
+  该 supplier 对非 legacy 材质走 `Registry.ITEM.get(key)`，进入 MockBukkit 的
+  `RegistryMock.loadIfEmpty`，后者会触发 Paper `Tag` 类的初始化，而 `Tag.<clinit>` 调用
+  `Bukkit.getTag(...)` —— 没有真实服务器时它为 null。（同一个 supplier 里确实还有一处
+  `Bukkit.getUnsafe()`，但那在 `isLegacy()` 分支上，普通材质不走。）
 
 实测（在模块测试 classpath 上运行、不调用 `MockBukkit.mock()` 的独立探针）：`Bukkit.getServer()`
 为 `null` 时，上述四类常量连同 `Material.DIAMOND.isAir()`、`Material.STONE.asBlockType()`
