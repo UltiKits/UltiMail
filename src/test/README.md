@@ -93,15 +93,42 @@ src/test/java/com/ultikits/plugins/mail/
 处失败，尚未触及任何注册表相关代码。
 
 `SendMailCommandTest` 中的 8 个用例则是另一类问题：经由
-`Material.isAir -> Material.asBlockType` 触达 Bukkit 注册表，在没有真实测试期服务器的情况下抛出
-`IllegalStateException: No RegistryAccess implementation found`。
+`Material.isAir -> Material.asBlockType` 触达 Bukkit 注册表，而旧依赖
+`MockBukkit-v1.19:3.1.0` 的 jar 内**没有**任何 `io.papermc.paper.registry.RegistryAccess`
+的 `META-INF/services` 声明（该 jar 只声明了 `LegacyComponentSerializer$Provider` 与
+`org.bukkit.plugin.PluginLoader` 两项），`ServiceLoader` 因此找不到实现，抛出
+`IllegalStateException: No RegistryAccess implementation found`。缺的是 classpath 上的
+ServiceLoader 提供者，与「有没有引导真实测试期服务器」无关——不要把两者混为一谈。
 
 **解决方式：** 将 MockBukkit 从 `com.github.seeseemelk:MockBukkit-v1.19:3.1.0` 迁移到框架自身已在使用的
 `org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.101.0`（同时移除仅为该旧依赖存在的 `jitpack.io`
 仓库配置）。迁移后三个 GUI 测试类的 `@Disabled` 被移除并全部通过；
-`SendMailCommandTest` 的 8 个用例通过引导真实的 MockBukkit 测试服务器解决。
-`UltiMailRegistrySentinelTest` 作为回归防护：如果测试服务器引导被静默移除，
-该哨兵会失败，防止此类问题再次悄悄重现。
+`SendMailCommandTest` 的 8 个用例随之自动修复，且**没有**引导任何测试服务器：
+`mockbukkit-v1.21-4.101.0.jar` 携带
+`META-INF/services/io.papermc.paper.registry.RegistryAccess`
+（→ `org.mockbukkit.mockbukkit.registry.RegistryAccessMock`）与
+`META-INF/services/io.papermc.paper.ServerBuildInfo`
+（→ `ServerBuildInfoMock`），注册表常量仅凭该依赖位于 classpath 即可解析。该测试类
+自身仍是纯 Mockito——其类头写明 "Uses pure Mockito (no MockBukkit)"，全文不出现
+`MockBukkit` 或 `MockBukkitHelper`。
+
+**这条区分贯穿整个 Phase 14，务必分清：**
+
+- **注册表常量解析**——`Material.X`、`Sound.X`、`InventoryType.X`、`PotionEffectType.X`
+  能否解析、其类初始化能否成功——来自 classpath 上的 ServiceLoader 提供者，**不需要真实服务器**。
+- **物品构造**——`new ItemStack(Material.X)`、真实的 `ItemMeta`——**需要**真实服务器，
+  因为 `Material.asItemType()` 要经过 `Bukkit.getUnsafe()`。
+
+实测（在模块测试 classpath 上运行、不调用 `MockBukkit.mock()` 的独立探针）：`Bukkit.getServer()`
+为 `null` 时，上述四类常量连同 `Material.DIAMOND.isAir()`、`Material.STONE.asBlockType()`
+全部通过，而 `new ItemStack(Material.DIAMOND)` 抛出
+`IllegalArgumentException: DIAMOND isn't an item`；改为先调用 `MockBukkit.mock()` 后，
+`Bukkit.getUnsafe()` 返回 `UnsafeValuesMock`，同一行构造随即成功。
+
+`UltiMailRegistrySentinelTest` 作为回归防护，守的正是后一半：它的每条断言都依赖真实服务器实例
+（`Bukkit.getUnsafe()`、`Bukkit.createProfile(...)`、`new ItemStack(...)`），刻意不断言任何
+裸常量——裸常量只要依赖还在 classpath 上就能通过，无法察觉引导被移除。若模块共享的
+`MockBukkitHelper.bootstrapServer()` 引导被静默移除或换成裸 Mockito `Server`，该哨兵即失败。
 
 ## 贡献指南
 

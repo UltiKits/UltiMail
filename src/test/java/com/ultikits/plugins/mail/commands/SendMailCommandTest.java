@@ -156,16 +156,17 @@ class SendMailCommandTest {
     class AdminAttachmentCallbackTests {
 
         // AttachmentSelectorPage is a `gui`-package class excluded from the coverage
-        // gate (D-07) and genuinely cannot be constructed here -- its base class
-        // needs a live obliviate-invs InventoryAPI/Bukkit inventory, which this
-        // module's own AttachmentSelectorPageTest can only exercise under
-        // MockBukkit, currently @Disabled for a Java 21/Paper API compatibility
-        // reason unrelated to this plan. What IS in scope and in this class (not
-        // AttachmentSelectorPage's own gui/ code) is the pair of callback lambdas
-        // `sendMailWithItems` builds and hands to that constructor. mockConstruction
-        // replaces the constructor with a no-op mock and hands back the exact
-        // arguments passed to it -- including those two lambdas -- so their bodies
-        // can be invoked and pinned directly without ever running a line of the
+        // gate (D-07) and genuinely cannot be constructed here -- its base class needs
+        // a live obliviate-invs InventoryAPI/Bukkit inventory. The module's own
+        // AttachmentSelectorPageTest exercises it under MockBukkit and is no longer
+        // @Disabled: Phase 14 migrated this module onto mockbukkit-v1.21 and re-enabled
+        // it. This class deliberately stays on pure Mockito and bootstraps no server,
+        // so a live inventory is still out of reach here. What IS in scope and in this
+        // class (not AttachmentSelectorPage's own gui/ code) is the pair of callback
+        // lambdas `sendMailWithItems` builds and hands to that constructor.
+        // mockConstruction replaces the constructor with a no-op mock and hands back
+        // the exact arguments passed to it -- including those two lambdas -- so their
+        // bodies can be invoked and pinned directly without ever running a line of the
         // excluded GUI class itself.
         private List<Object> capturedArgs;
 
