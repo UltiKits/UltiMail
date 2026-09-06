@@ -156,7 +156,8 @@ class SendMailCommandTest {
     class AdminAttachmentCallbackTests {
 
         // AttachmentSelectorPage is a `gui`-package class excluded from the coverage
-        // gate (D-07) and genuinely cannot be constructed here -- its base class needs
+        // gate by pom.xml's `<exclude>**/gui/**</exclude>`, and genuinely cannot be
+        // constructed here -- its base class needs
         // a live obliviate-invs InventoryAPI/Bukkit inventory. The module's own
         // AttachmentSelectorPageTest exercises it under MockBukkit and is no longer
         // @Disabled: Phase 14 migrated this module onto mockbukkit-v1.21 and re-enabled

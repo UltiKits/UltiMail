@@ -970,7 +970,8 @@ class MailCommandTest {
     class GuiOpenerTests {
 
         // MailboxGUI/SentboxGUI are `gui`-package classes excluded from the coverage
-        // gate (D-07); their own construction needs a live obliviate-invs
+        // gate by pom.xml's `<exclude>**/gui/**</exclude>`; their own construction
+        // needs a live obliviate-invs
         // InventoryAPI, which this module cannot stand up outside MockBukkit.
         // mockConstruction replaces the constructor with a no-op mock so the
         // *calling* method here (openInboxGUI/openSentboxGUI, both plain MailCommand
