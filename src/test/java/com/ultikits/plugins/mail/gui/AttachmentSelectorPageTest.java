@@ -1,8 +1,7 @@
 package com.ultikits.plugins.mail.gui;
 
-import be.seeseemelk.mockbukkit.MockBukkit;
-import be.seeseemelk.mockbukkit.ServerMock;
-import be.seeseemelk.mockbukkit.entity.PlayerMock;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.plugins.mail.utils.MockBukkitHelper;
 import com.ultikits.plugins.mail.utils.TestHelper;
@@ -24,22 +23,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for AttachmentSelectorPage.
  * <p>
  * 附件选择 GUI 单元测试。
- * <p>
- * 注意: 需要 MockBukkit，由于 Java 21 + Paper API 兼容性问题暂时禁用。
  */
 @DisplayName("AttachmentSelectorPage 测试")
 @ExtendWith(MockitoExtension.class)
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
-@Disabled("MockBukkit 与 Java 21 + Paper API 存在兼容性问题，待修复")
 class AttachmentSelectorPageTest {
 
     private PlayerMock player;
 
     @BeforeEach
     void setUp() {
-        MockBukkitHelper.ensureCleanState();
-        ServerMock server = MockBukkit.mock();
-        MockBukkit.createMockPlugin();
+        ServerMock server = MockBukkitHelper.bootstrapServer();
 
         // Setup mock UltiToolsPlugin
         TestHelper.mockUltiToolsPlugin();
