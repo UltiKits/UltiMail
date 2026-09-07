@@ -395,6 +395,90 @@ class MailServiceTest {
         }
     }
 
+    // ==================== sendMail raw-message-channel tests ====================
+
+    /**
+     * {@code sendMail(...)} is reachable from within a modal Bukkit conversation
+     * ({@code SendMailCommand.ContentPrompt.acceptInput}, called before the conversation ends).
+     * {@code Player#sendMessage} is a documented no-op while
+     * {@code Conversable#isConversingModally()} is true; only {@code sendRawMessage} always
+     * delivers. Every refusal path below must use the raw channel so the sender is actually told
+     * why, not just structurally "messaged" in source that never reaches a real client.
+     */
+    @Nested
+    @DisplayName("sendMail 拒绝时应通过 raw 消息通道通知发送者")
+    class SendMailRawMessageChannelTests {
+
+        @Test
+        @DisplayName("冷却期间拒绝应通过 raw 通道恰好通知一次")
+        void shouldNotifyViaRawMessageWhenOnCooldown() throws Exception {
+            getCooldownMap().put(senderUuid, System.currentTimeMillis());
+
+            boolean result = mailService.sendMail(sender, "ReceiverPlayer", "标题", "内容", null);
+
+            assertThat(result).isFalse();
+            verify(sender, times(1)).sendRawMessage(anyString());
+            verify(sender, never()).sendMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("标题过长拒绝应通过 raw 通道恰好通知一次")
+        void shouldNotifyViaRawMessageWhenSubjectTooLong() {
+            String longSubject = String.join("", Collections.nCopies(100, "a"));
+
+            boolean result = mailService.sendMail(sender, "ReceiverPlayer", longSubject, "内容", null);
+
+            assertThat(result).isFalse();
+            verify(sender, times(1)).sendRawMessage(anyString());
+            verify(sender, never()).sendMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("内容过长拒绝应通过 raw 通道恰好通知一次")
+        void shouldNotifyViaRawMessageWhenContentTooLong() {
+            String longContent = String.join("", Collections.nCopies(1000, "a"));
+
+            boolean result = mailService.sendMail(sender, "ReceiverPlayer", "标题", longContent, null);
+
+            assertThat(result).isFalse();
+            verify(sender, times(1)).sendRawMessage(anyString());
+            verify(sender, never()).sendMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("接收者不存在拒绝应通过 raw 通道恰好通知一次")
+        void shouldNotifyViaRawMessageWhenReceiverNotFound() {
+            mockedBukkit.when(() -> Bukkit.getPlayerExact("nonexistent")).thenReturn(null);
+            OfflinePlayer offlinePlayer = mock(OfflinePlayer.class);
+            when(offlinePlayer.hasPlayedBefore()).thenReturn(false);
+            when(offlinePlayer.isOnline()).thenReturn(false);
+            mockedBukkit.when(() -> Bukkit.getOfflinePlayer("nonexistent")).thenReturn(offlinePlayer);
+
+            boolean result = mailService.sendMail(sender, "nonexistent", "标题", "内容", null);
+
+            assertThat(result).isFalse();
+            verify(sender, times(1)).sendRawMessage(anyString());
+            verify(sender, never()).sendMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("附件超过上限拒绝应通过 raw 通道恰好通知一次")
+        void shouldNotifyViaRawMessageWhenTooManyItems() {
+            ItemStack[] items = new ItemStack[28]; // default maxItems is 27
+            for (int i = 0; i < items.length; i++) {
+                ItemStack item = mock(ItemStack.class);
+                lenient().when(item.getType()).thenReturn(Material.STONE);
+                items[i] = item;
+            }
+
+            boolean result = mailService.sendMail(sender, "ReceiverPlayer", "标题", "内容", items);
+
+            assertThat(result).isFalse();
+            verify(sender, times(1)).sendRawMessage(anyString());
+            verify(sender, never()).sendMessage(anyString());
+        }
+    }
+
     // ==================== getInbox Tests ====================
 
     @Nested
@@ -1068,7 +1152,7 @@ class MailServiceTest {
             mailService.sendMail(sender, "ReceiverPlayer", "标题2", "内容2", null);
 
             // Second send should show cooldown msg
-            verify(sender, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender, atLeast(1)).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_cooldown]")
             ));
         }
@@ -1079,7 +1163,7 @@ class MailServiceTest {
             String longSubject = String.join("", Collections.nCopies(100, "a"));
             mailService.sendMail(sender, "ReceiverPlayer", longSubject, "内容", null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_subject_too_long]")
             ));
         }
@@ -1090,7 +1174,7 @@ class MailServiceTest {
             String longContent = String.join("", Collections.nCopies(1000, "a"));
             mailService.sendMail(sender, "ReceiverPlayer", "标题", longContent, null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_content_too_long]")
             ));
         }
@@ -1106,7 +1190,7 @@ class MailServiceTest {
 
             mailService.sendMail(sender, "ghost", "标题", "内容", null);
 
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_player_not_found]")
             ));
         }
@@ -2164,7 +2248,7 @@ class MailServiceTest {
             boolean result = mailService.sendMail(sender, "ReceiverPlayer", "标题", "内容", items);
 
             assertThat(result).isFalse();
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[send_items_too_many]")
             ));
             verify(mockDataOperator, never()).insert(any());

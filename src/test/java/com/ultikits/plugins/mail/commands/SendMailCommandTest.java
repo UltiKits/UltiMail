@@ -656,7 +656,7 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("acceptInput 发送成功应发送成功消息")
+        @DisplayName("acceptInput 发送成功应通过 raw 消息通道恰好发送一次成功消息")
         void shouldSendSuccessMessageOnSuccess() throws Exception {
             Class<?> contentPromptClass = Class.forName(
                 "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
@@ -680,15 +680,20 @@ class SendMailCommandTest {
 
             acceptInput.invoke(prompt, ctx, "邮件内容");
 
+            // The player is still inside a modal conversation when acceptInput runs -- Bukkit's
+            // (and MockBukkit's own faithfully-reimplemented) Player#sendMessage is a documented
+            // no-op while Conversable#isConversingModally() is true, so the confirmation must use
+            // sendRawMessage, which always delivers, or it is silently dropped on a real client.
             // Mock i18n returns "[mail_sent_success]", replace("{RECEIVER}", ...) has no effect
             // since the mock key doesn't contain {RECEIVER}
-            verify(sender).sendMessage(ArgumentMatchers.<String>argThat(msg ->
+            verify(sender, times(1)).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
                 msg.contains("[mail_sent_success]")
             ));
+            verify(sender, never()).sendMessage(anyString());
         }
 
         @Test
-        @DisplayName("acceptInput 发送失败不应发送成功消息")
+        @DisplayName("acceptInput 发送失败不应自行额外发送任何消息")
         void shouldNotSendSuccessMessageOnFailure() throws Exception {
             Class<?> contentPromptClass = Class.forName(
                 "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
@@ -712,10 +717,53 @@ class SendMailCommandTest {
 
             acceptInput.invoke(prompt, ctx, "邮件内容");
 
-            // Should NOT send success message when sendMail returns false
-            verify(sender, never()).sendMessage(ArgumentMatchers.<String>argThat(msg ->
-                msg.contains("ReceiverName")
-            ));
+            // On a refusal, MailService.sendMail(...) has already sent exactly one message of its
+            // own (see MailServiceTest's raw-message-channel tests) before returning false;
+            // acceptInput itself must add nothing further, or the player would see two messages
+            // for a single refusal.
+            verify(sender, never()).sendMessage(anyString());
+            verify(sender, never()).sendRawMessage(anyString());
+        }
+
+        @Test
+        @DisplayName("acceptInput 发送失败且携带附件时应将附件退还给发送者")
+        void shouldReturnAttachmentsToSenderOnFailure() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            ItemStack goldIngot = mock(ItemStack.class);
+            when(goldIngot.getType()).thenReturn(Material.GOLD_INGOT);
+            ItemStack[] attachItems = new ItemStack[]{diamond, goldIngot};
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+            when(ctx.getSessionData("attachItems")).thenReturn(attachItems);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), eq(attachItems)))
+                .thenReturn(false);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            acceptInput.invoke(prompt, ctx, "邮件内容");
+
+            // MailService.sendMail(...) never persists attachments on a false return -- none of
+            // its five refusal branches touch `items`. The GUI allows up to 45 selected items
+            // while MailConfig.maxItems defaults to 27, so selecting 28-45 items is guaranteed to
+            // hit the "too many items" refusal and, before this fix, silently destroy every item
+            // the sender had staked. acceptInput is the only place that still holds a reference
+            // to `items` after MailService.sendMail(...) declines them.
+            verify(senderInventory).addItem(diamond);
+            verify(senderInventory).addItem(goldIngot);
         }
 
         @Test

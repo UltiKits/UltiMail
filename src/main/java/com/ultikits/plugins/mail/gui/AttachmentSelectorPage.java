@@ -19,7 +19,10 @@ import java.util.function.Consumer;
 /**
  * GUI for selecting multiple attachments.
  * <p>
- * Players can drag items into the GUI to add them as attachments.
+ * Players can click to place items into the GUI to add them as attachments. Drag-placement is
+ * not supported: {@code Gui.onDrag(InventoryDragEvent)} defaults to cancelling any drag into this
+ * page's own top inventory, and this class does not override it (see {@link #onClick} for the
+ * click-side override that does exist).
  * This is only available for admins with ultimail.admin.sendall permission.
  *
  * @author wisdomme
@@ -64,6 +67,34 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
     protected void setupDialogContent(InventoryOpenEvent event) {
         // Content area is left empty for players to place items
         // The bottom toolbar is set up by parent class
+    }
+
+    /**
+     * Lets a player freely place and remove items in the content area (slots {@code 0} to
+     * {@code CONTENT_SIZE - 1}).
+     * <p>
+     * The cancellation this overrides is not applied by this class, nor by
+     * {@code BaseConfirmationPage}, nor by {@code BaseInventoryPage} -- none of the three
+     * overrides this hook, so the {@code obliviate-invs} library's own
+     * {@code mc.obliviate.inventory.Gui.onClick(InventoryClickEvent)} default (unconditionally
+     * {@code false}) runs instead. The library's {@code InvListener}, which reads that return
+     * value, cancels every click landing on a raw slot inside this page's own top inventory
+     * unless it is told the click was handled (verified by disassembling the shaded framework
+     * jar's {@code mc/obliviate/inventory/InvListener.class}: an unhandled click whose
+     * {@code getSlot() == getRawSlot()} is unconditionally cancelled). Returning {@code true}
+     * only for raw slots inside the content area is the narrowest override that lets placement
+     * through: the bottom toolbar (the confirm/cancel buttons, slots {@code CONTENT_SIZE} and
+     * up) is left unhandled here, so it keeps the same default cancellation it already had,
+     * protecting those icons from being picked up or swapped.
+     *
+     * @param event the click event
+     * @return {@code true} (handled -- do not cancel) for a content-area slot, {@code false}
+     *     (unhandled -- fall back to the library's own default) otherwise
+     */
+    @Override
+    public boolean onClick(InventoryClickEvent event) {
+        int rawSlot = event.getRawSlot();
+        return rawSlot >= 0 && rawSlot < CONTENT_SIZE;
     }
     
     @Override

@@ -45,6 +45,19 @@
             <version>${ultitools.version}</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Provided at runtime by Paper's own library loader via the framework's plugin.yml
+             libraries: block; declared here, matching the same provided-scope pattern already
+             used in UltiChat/UltiEssentials/UltiRemoteBag/UltiTrade's pom.xml, so tests that
+             open a real BaseInventoryPage/BaseConfirmationPage (whose setupBottomToolbar()
+             reaches XVersionUtils.getColoredPlaneGlass -> XMaterial) do not fail with
+             NoClassDefFoundError: com/cryptomorin/xseries/XMaterial on this module's own test
+             classpath, which does not inherit the framework's own provided-scope dependency. -->
+        <dependency>
+            <groupId>com.github.cryptomorin</groupId>
+            <artifactId>XSeries</artifactId>
+            <version>13.0.0</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
