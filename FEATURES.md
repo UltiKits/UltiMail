@@ -22,7 +22,10 @@ for UAT execution and issue reconciliation — the public description of these f
   This module has no `scheduled` rows (`@Scheduled` count is 0, confirmed below), no `gate` rows
   (`@ConditionalOnConfig` count is 0), and no `placeholder` rows (this module registers no
   PlaceholderAPI expansion and consumes none) — all three Kinds stay in the vocabulary for
-  cross-repository consistency even though none appears below.
+  cross-repository consistency even though none appears below. The one row under `## Lifecycle Hooks` is an
+  `event` row with no `@EventHandler` site behind it: `/ul reload` is a framework-invoked
+  lifecycle step, not a command this repository maps or a config read, so `event` is the
+  closest-fitting Kind.
 - **Tier**, exactly three: `player`, `admin`, `internal`. Judged from what the feature is for, not
   from whether it carries a permission string — this module's three `@CmdExecutor` classes each
   declare exactly one class-level permission node (`ultimail.use`, `ultimail.send`,
@@ -176,6 +179,23 @@ Phase 9 excluded all three classes below from this module's JaCoCo `check` gate
 | ultimail.gui.attachment-selector | 45-slot free-placement content area plus a confirm/cancel toolbar for selecting mail attachments; confirming past `max-items` returns the excess to the player and truncates the selection; cancelling or closing without confirming returns every placed item | gui | opened by `ultimail.mail.broadcast-with-items` or `ultimail.sendmail.attach` (admin branch) | n/a | n/a | player | detailed | AttachmentSelectorPage#onConfirm |
 | ultimail.gui.mailbox | Paginated inbox: one icon per mail (book if read, writable book if unread), lore shows sender/time/content preview and claim state; clicking marks read, executes attached commands on first read, and claims items if space allows | gui | `ultimail.mail.read-gui` | n/a | n/a | player | detailed | MailboxGUI#handleMailClick |
 | ultimail.gui.sentbox | Paginated sentbox: one icon per sent mail (map if read by receiver, paper if unread), lore shows receiver/time/content preview and claim state; read-only — clicking only redisplays the content in chat, no state changes | gui | `ultimail.mail.sentbox-gui` | n/a | n/a | player | brief | SentboxGUI#createMailIcon |
+
+## Lifecycle Hooks
+
+As of UltiTools 6.3.0 `UltiToolsPlugin#unregisterSelf()` and `UltiToolsPlugin#reloadSelf()` are
+`final` framework template methods. Before `UltiKits/UltiMail#20` this module overrode both
+directly, completely replacing the framework's own steps, and each override only logged a line;
+both were deleted rather than renamed, so this module has neither an `onUnregister()` nor an
+`onReload()` hook. `/ul reload UltiMail` (and `/ul reload`, which reloads every module) now runs
+only the framework's own reload steps: config reload, language refresh, `@ConditionalOnConfig`
+drift report, and the framework's per-module `Module 'UltiMail' reloaded.` INFO line.
+`ultimail.lifecycle.reload` records what that changes for an operator: `ConfigManager#reloadConfigs`
+re-initialises, in place, the same `MailConfig` instance the container injected into `MailService`,
+`MailNotifyListener` and `RecallCommand`, and each of them calls its getters at call time.
+
+| ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
+|---|---|---|---|---|---|---|---|---|
+| ultimail.lifecycle.reload | `/ul reload UltiMail` re-reads `config/mail.yml` into the running module, so an edited value such as `max-subject-length` applies to the next mail submitted without a restart; this module adds no reload work of its own (it has no `onReload()` hook) and prints no reload line of its own. Before `UltiKits/UltiMail#20` the module's reload override replaced the framework's reload and only logged, so an edit took effect only after a restart | event | `/ul reload UltiMail` (framework calls `reloadSelf()`, which reloads configuration, refreshes language, reports `@ConditionalOnConfig` drift and logs its own per-module line) | n/a | n/a | admin | brief | MailService#sendMail |
 
 ## Data persistence
 

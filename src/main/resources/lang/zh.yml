@@ -2,8 +2,6 @@
 
 # === 系统消息 ===
 mail_enabled: "UltiMail 已启用！"
-mail_disabled: "UltiMail 已禁用！"
-mail_reloaded: "UltiMail 配置已重载！"
 
 # === 收件箱 ===
 inbox_empty: "收件箱为空！"
