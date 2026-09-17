@@ -6,6 +6,9 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,7 +17,7 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for UltiMail plugin main class.
  * <p>
- * Tests lifecycle methods and annotation configuration.
+ * Tests the enable hook, the lifecycle template-method contract and annotation configuration.
  */
 @DisplayName("UltiMail 测试")
 @ExtendWith(MockitoExtension.class)
@@ -56,53 +59,26 @@ class UltiMailTest {
     }
 
     @Nested
-    @DisplayName("unregisterSelf 测试")
-    class UnregisterSelfTests {
+    @DisplayName("Lifecycle template methods (UltiKits/UltiMail#20)")
+    class LifecycleTemplateMethodTests {
 
+        /**
+         * UltiTools 6.3.0 makes {@code unregisterSelf()} and {@code reloadSelf()} final
+         * template methods that always run the framework's own steps (config reload, language
+         * refresh, command and listener unregistration) before or after the module hook. This
+         * module's former overrides only logged a line and never called {@code super}, so a
+         * reload re-read nothing (UltiKits/UltiMail#20). They are deleted outright; this test
+         * pins that neither is declared again.
+         */
         @Test
-        @DisplayName("unregisterSelf 应该记录禁用消息")
-        void shouldLogDisableMessage() {
-            UltiMail plugin = mock(UltiMail.class);
-            PluginLogger logger = mock(PluginLogger.class);
-            when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).unregisterSelf();
+        @DisplayName("UltiMail declares neither framework template method")
+        void declaresNeitherTemplateMethod() {
+            List<String> declared = new ArrayList<>();
+            for (Method method : UltiMail.class.getDeclaredMethods()) {
+                declared.add(method.getName());
+            }
 
-            plugin.unregisterSelf();
-
-            verify(logger).info(anyString());
-        }
-    }
-
-    @Nested
-    @DisplayName("reloadSelf 测试")
-    class ReloadSelfTests {
-
-        @Test
-        @DisplayName("reloadSelf 应该记录重载消息")
-        void shouldLogReloadMessage() {
-            UltiMail plugin = mock(UltiMail.class);
-            PluginLogger logger = mock(PluginLogger.class);
-            when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).reloadSelf();
-
-            plugin.reloadSelf();
-
-            verify(logger).info(anyString());
-        }
-
-        @Test
-        @DisplayName("reloadSelf 不应该抛出异常")
-        void shouldNotThrowException() {
-            UltiMail plugin = mock(UltiMail.class);
-            PluginLogger logger = mock(PluginLogger.class);
-            when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
-            doCallRealMethod().when(plugin).reloadSelf();
-
-            // Should not throw
-            plugin.reloadSelf();
+            assertThat(declared).doesNotContain("unregisterSelf", "reloadSelf");
         }
     }
 
