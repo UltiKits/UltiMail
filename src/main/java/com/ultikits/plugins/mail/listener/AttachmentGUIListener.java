@@ -17,9 +17,12 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Listener for the attachment selector GUI.
@@ -53,6 +56,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @EventListener
 public class AttachmentGUIListener implements Listener {
+
+    private static final Logger LOGGER = Logger.getLogger(AttachmentGUIListener.class.getName());
 
     /**
      * The attachment selector each player currently has open. An entry exists from the moment the
@@ -144,6 +149,62 @@ public class AttachmentGUIListener implements Listener {
         AttachmentSelectorPage page = openPages.remove(event.getPlayer().getUniqueId());
         if (page != null) {
             page.returnAllItems();
+        }
+    }
+
+    /**
+     * Hands back every item still held by a selector that is open right now, and forgets the pages
+     * it returned.
+     * <p>
+     * <b>Why this exists as well as the close and quit handlers.</b> Both of those need an event,
+     * and there is no event when this module is unloaded. On the Paper 1.21 server this module
+     * targets, {@code MinecraftServer#stopServer()} calls {@code CraftServer#disablePlugins()}
+     * (bytecode offset 126) before {@code PlayerList#removeAll(boolean)} (offset 199), so this
+     * listener is already unregistered when the close events finally fire; and
+     * {@code /upm uninstall UltiMail} unregisters it while every player stays online. Either way
+     * the items an open selector was holding exist only in an in-memory
+     * {@code Bukkit.createInventory(...)} container that nothing persists.
+     * <p>
+     * The same ordering is what makes this work rather than merely move the loss:
+     * {@code PlayerList#saveAll()} (offset 188) and each removed player's own {@code save(...)}
+     * (offset 183 of {@code PlayerList#remove}) both run AFTER {@code disablePlugins()}, so an
+     * item put into an online player's inventory from here is written to disk.
+     * <p>
+     * Call this from the module's {@code onUnregister()} hook, which the framework runs BEFORE it
+     * unregisters this module's listeners, so the tracking below is still intact.
+     */
+    public void returnEveryOpenSelector() {
+        for (UUID owner : new ArrayList<>(openPages.keySet())) {
+            AttachmentSelectorPage page = openPages.remove(owner);
+            if (page == null) {
+                continue;
+            }
+            // The return comes first and unconditionally: it is the invariant, and closing the
+            // inventory below is only cosmetic.
+            page.returnAllItems();
+            closeQuietly(page);
+        }
+    }
+
+    /**
+     * Closes {@code page}'s now-empty inventory so its owner is not left looking at a GUI that no
+     * longer answers -- which is what {@code /upm uninstall} would otherwise leave behind, and
+     * whose confirm button would then try to schedule work on a disabled plugin.
+     * <p>
+     * Deliberately best-effort, and deliberately after the items are already safe: on Paper 1.21
+     * the GUI library's own close handler raises {@link IncompatibleClassChangeError} (see this
+     * class's javadoc), so letting a close failure escape would abort the loop above and leave
+     * later players' items unreturned -- trading the invariant for a cosmetic detail. The failure
+     * is logged rather than swallowed silently.
+     */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException") // deliberate barrier -- see javadoc above
+    private void closeQuietly(AttachmentSelectorPage page) {
+        try {
+            page.player.closeInventory();
+        } catch (RuntimeException | Error e) {
+            LOGGER.log(Level.WARNING,
+                    "Could not close an attachment selector during unload; its items were already "
+                            + "returned to their owner", e);
         }
     }
 
