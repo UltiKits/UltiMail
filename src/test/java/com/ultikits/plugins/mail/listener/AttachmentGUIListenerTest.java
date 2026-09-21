@@ -712,6 +712,21 @@ class AttachmentGUIListenerTest {
             assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
                     .as("a close event arriving after the unload return must not duplicate the item")
                     .isEqualTo(3);
+
+            // The tracking entry really is gone, not merely emptied of consequence: a page this
+            // listener has already settled and closed is no longer its business, so anything that
+            // ends up in that inventory afterwards is not its to hand out. Without the removal the
+            // second unload below would give the extra stack away too.
+            page.getInventory().setItem(0, new ItemStack(PLACED, 9));
+            listener.returnEveryOpenSelector();
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("a second unload must not reach into a page this listener has already "
+                            + "settled and forgotten")
+                    .isEqualTo(3);
+            assertThat(countInContentArea(PLACED))
+                    .as("and that later stack must be left exactly where it was put")
+                    .isEqualTo(9);
         }
 
         @Test
