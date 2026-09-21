@@ -762,8 +762,12 @@ class SendMailCommandTest {
             // hit the "too many items" refusal and, before this fix, silently destroy every item
             // the sender had staked. acceptInput is the only place that still holds a reference
             // to `items` after MailService.sendMail(...) declines them.
-            verify(senderInventory).addItem(diamond);
-            verify(senderInventory).addItem(goldIngot);
+            //
+            // Both items go back in ONE addItem(...) call (the shared ItemReturns#giveOrDrop
+            // path), which is also what lets identical stacks merge; what that call could not fit
+            // is dropped rather than discarded, asserted against real inventory state in
+            // SendMailCommandConversationIntegrationTest rather than against this mock.
+            verify(senderInventory).addItem(diamond, goldIngot);
         }
 
         @Test

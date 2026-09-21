@@ -8,7 +8,10 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +60,9 @@ class SendMailCommandConversationIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         ServerMock server = MockBukkitHelper.bootstrapServer();
+        // An attachment that can no longer fit in the sender's inventory is dropped at their
+        // location, which needs a world to drop into.
+        server.addSimpleWorld("world");
         PluginMock plugin = MockBukkit.createMockPlugin();
         sender = server.addPlayer("sender");
 
@@ -134,5 +140,77 @@ class SendMailCommandConversationIntegrationTest {
         assertThat(sender.nextComponentMessage())
             .as("a refusal must not queue any message from acceptInput itself")
             .isNull();
+    }
+
+    /**
+     * Starts the single-attachment (non-admin) send path with one copper ingot in the sender's
+     * main hand, then fills every inventory slot -- the state a player reaches by picking things
+     * up while typing the mail's content, which is the only way an attachment return can find no
+     * room. Both attachment-return paths in this class ({@code ContentPrompt.acceptInput}'s
+     * refusal branch and the conversation-abandoned listener) are the same defect class as
+     * {@code UltiKits/UltiMail#27}: the module hands the items back with
+     * {@code Inventory#addItem} and discards what could not fit.
+     */
+    private void startSingleAttachmentSendAndFillTheInventory() {
+        sender.getInventory().setItemInMainHand(new ItemStack(Material.COPPER_INGOT, 1));
+
+        command.sendMailWithItems(sender, "ReceiverName", "TestSubject");
+
+        assertThat(sender.getInventory().getItemInMainHand().getType())
+            .as("the attachment path takes the item out of the sender's hand immediately")
+            .isNotEqualTo(Material.COPPER_INGOT);
+        assertThat(sender.isConversing())
+            .as("the content conversation must have started, otherwise this test proves nothing")
+            .isTrue();
+
+        for (int slot = 0; slot < sender.getInventory().getSize(); slot++) {
+            sender.getInventory().setItem(slot, new ItemStack(Material.STONE, 64));
+        }
+        assertThat(sender.getInventory().firstEmpty())
+            .as("the sender must really have no room for the returned attachment")
+            .isEqualTo(-1);
+    }
+
+    private int countDroppedCopper() {
+        int total = 0;
+        for (Item item : sender.getWorld().getEntitiesByClass(Item.class)) {
+            if (item.getItemStack().getType() == Material.COPPER_INGOT) {
+                total += item.getItemStack().getAmount();
+            }
+        }
+        return total;
+    }
+
+    @Test
+    @DisplayName("发送被拒绝且背包已满时附件应掉落而不是被销毁")
+    void aRefusedSendDropsTheAttachmentWhenTheSenderHasNoRoomLeft() {
+        when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), any()))
+            .thenReturn(false);
+        startSingleAttachmentSendAndFillTheInventory();
+
+        sender.acceptConversationInput("邮件内容");
+
+        assertThat(countDroppedCopper())
+            .as("a refusal is the last point that still holds the attachment, so an item that no "
+                + "longer fits must be dropped rather than destroyed")
+            .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("取消对话且背包已满时附件应掉落而不是被销毁")
+    void anAbandonedConversationDropsTheAttachmentWhenTheSenderHasNoRoomLeft() {
+        startSingleAttachmentSendAndFillTheInventory();
+
+        // "cancel" is this conversation's escape sequence, so this abandons it non-gracefully --
+        // the branch that gives the attachment back.
+        sender.acceptConversationInput("cancel");
+
+        assertThat(sender.isConversing())
+            .as("the escape sequence must really have abandoned the conversation")
+            .isFalse();
+        assertThat(countDroppedCopper())
+            .as("an abandoned conversation must give the attachment back, dropping what no longer "
+                + "fits rather than destroying it")
+            .isEqualTo(1);
     }
 }

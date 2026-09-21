@@ -8,6 +8,7 @@ import mc.obliviate.inventory.InventoryAPI;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -53,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AttachmentSelectorPageTest {
 
     private PlayerMock player;
+    private UltiToolsPlugin plugin;
     private AttachmentSelectorPage page;
     private final AtomicBoolean confirmed = new AtomicBoolean(false);
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -61,7 +63,11 @@ class AttachmentSelectorPageTest {
     @BeforeEach
     void setUp() {
         ServerMock server = MockBukkitHelper.bootstrapServer();
+        // A world is needed because an item that no longer fits in the player's inventory is
+        // dropped at their location rather than destroyed.
+        server.addSimpleWorld("world");
         UltiToolsPlugin mockPlugin = TestHelper.mockUltiToolsPlugin();
+        this.plugin = mockPlugin;
 
         // Register the real obliviate-invs InvListener with the mock plugin manager, exactly
         // as the framework does at startup, so every click in this test travels through the
@@ -252,6 +258,100 @@ class AttachmentSelectorPageTest {
         assertThat(event.isCancelled())
                 .as("a hotbar-swap placement in the attachment slots must not be cancelled")
                 .isFalse();
+    }
+
+    private int countInPlayerInventory(Material material) {
+        int total = 0;
+        for (ItemStack stack : player.getInventory().getContents()) {
+            if (stack != null && stack.getType() == material) {
+                total += stack.getAmount();
+            }
+        }
+        return total;
+    }
+
+    private int countDroppedInWorld(Material material) {
+        int total = 0;
+        for (Item item : player.getWorld().getEntitiesByClass(Item.class)) {
+            if (item.getItemStack().getType() == material) {
+                total += item.getItemStack().getAmount();
+            }
+        }
+        return total;
+    }
+
+    /** Fills every slot of the player's inventory so nothing more can be added to it. */
+    private void fillPlayerInventory() {
+        player.getInventory().clear();
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            player.getInventory().setItem(slot, new ItemStack(Material.STONE, 64));
+        }
+    }
+
+    @Test
+    @DisplayName("归还已放置的物品必须是一次性的：槽位先清空，再交还")
+    void returningPlacedItemsDrainsTheContentAreaSoItCannotHappenTwice() {
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 1));
+        assertThat(page.getInventory().getItem(0))
+                .as("the item must really be in the page, otherwise this test proves nothing")
+                .isNotNull();
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT)).isZero();
+
+        page.returnAllItems();
+        page.returnAllItems();
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT))
+                .as("the second call has nothing left to give back, because the first one emptied "
+                        + "the slot as it handed the item over")
+                .isEqualTo(1);
+        assertThat(page.getInventory().getItem(0))
+                .as("a returned item must no longer be in the page")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("背包已满时归还的物品应掉落而不是被销毁")
+    void aReturnedItemThatNoLongerFitsIsDroppedRatherThanDestroyed() {
+        fillPlayerInventory();
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 2));
+        assertThat(player.getInventory().firstEmpty())
+                .as("the inventory must really be full for the drop path to be reached")
+                .isEqualTo(-1);
+
+        page.returnAllItems();
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT)).isZero();
+        assertThat(countDroppedInWorld(Material.COPPER_INGOT))
+                .as("an item with nowhere to go must be dropped at the player's feet")
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("确认时超出上限的物品在背包已满时应掉落而不是被销毁")
+    void excessItemsAboveTheLimitAreDroppedWhenTheInventoryIsFull() {
+        AtomicReference<ItemStack[]> attached = new AtomicReference<>();
+        AttachmentSelectorPage limitedPage = new AttachmentSelectorPage(player, 1, plugin,
+                attached::set, () -> { });
+        limitedPage.open();
+        limitedPage.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 1));
+        limitedPage.getInventory().setItem(1, new ItemStack(Material.IRON_INGOT, 1));
+        fillPlayerInventory();
+        assertThat(player.getInventory().firstEmpty())
+                .as("the inventory must really be full for the drop path to be reached")
+                .isEqualTo(-1);
+
+        // onConfirm is protected; this test lives in the page's own package, which is the access
+        // the real confirm icon has too (its click action calls exactly this method).
+        limitedPage.onConfirm(null);
+
+        assertThat(attached.get())
+                .as("only the first item, up to the limit, may be attached")
+                .hasSize(1);
+        assertThat(countDroppedInWorld(Material.IRON_INGOT))
+                .as("the item above the limit must come back to the player -- dropped when there "
+                        + "is no inventory space, never destroyed")
+                .isEqualTo(1);
+        assertThat(countInPlayerInventory(Material.IRON_INGOT)).isZero();
     }
 
     @Test
