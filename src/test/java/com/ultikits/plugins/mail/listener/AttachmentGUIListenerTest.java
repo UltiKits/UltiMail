@@ -623,6 +623,112 @@ class AttachmentGUIListenerTest {
     }
 
     @Nested
+    @DisplayName("模块卸载时的归还")
+    class ModuleUnloadTests {
+
+        /**
+         * Gate 1 MJ-02. The close and quit returns both need an event, and there is no event when
+         * this module is unloaded -- {@code /upm uninstall UltiMail} unregisters its listeners
+         * while the player stays online, and on shutdown
+         * {@code CraftServer#disablePlugins()} runs at bytecode offset 126 of
+         * {@code MinecraftServer#stopServer()} while {@code PlayerList#removeAll(Z)} is only
+         * reached at offset 199, so the listener is gone before any close event exists. Measured
+         * on the Paper 1.21.11 server jar this module targets.
+         * <p>
+         * That same ordering is what makes the fix work rather than merely move the loss:
+         * {@code PlayerList#saveAll()} sits at offset 188 and each removed player's own
+         * {@code save(...)} at offset 183 of {@code PlayerList#remove}, both AFTER
+         * {@code disablePlugins()} -- so an item handed to an online player's inventory from
+         * inside the module's unload hook is written to disk.
+         * <p>
+         * The cosmetic half of the hook -- closing the now-empty selector so the player is not
+         * left looking at a dead GUI -- is deliberately not asserted here: under MockBukkit
+         * {@code closeInventory()} aborts inside the GUI library's own close handler on the
+         * {@link IncompatibleClassChangeError} described in this class's javadoc, so whether the
+         * view was swapped is not observable. The real-machine row
+         * {@code ultimail.lifecycle.unload-returns-attachments} covers it instead.
+         */
+        private AttachmentSelectorPage openSelectorFor(PlayerMock owner, int amount) {
+            AttachmentSelectorPage owned = new AttachmentSelectorPage(owner, 27,
+                    TestHelper.getMockPlugin(), items -> { }, () -> { });
+            owned.open();
+            Bukkit.getPluginManager().callEvent(
+                    new InventoryOpenEvent(owner.getOpenInventory()));
+            owned.getInventory().setItem(0, new ItemStack(PLACED, amount));
+            return owned;
+        }
+
+        private int countInInventoryOf(PlayerMock who) {
+            int total = 0;
+            for (ItemStack stack : who.getInventory().getContents()) {
+                if (stack != null && stack.getType() == PLACED) {
+                    total += stack.getAmount();
+                }
+            }
+            return total;
+        }
+
+        @Test
+        @DisplayName("卸载时应把每一个打开中的选择界面里的物品归还其所有者")
+        void unloadingReturnsTheItemsOfEveryOpenSelector() {
+            PlayerMock second = server.addPlayer("unload-tester");
+            AttachmentSelectorPage secondPage = openSelectorFor(second, 7);
+            placeItemInContentArea(0, 3);
+
+            // Pre-assertions: both pages really hold their items and neither owner holds any.
+            assertThat(countInContentArea(PLACED)).isEqualTo(3);
+            assertThat(secondPage.getInventory().getItem(0)).isNotNull();
+            assertThat(countInPlayerInventory(PLACED)).isZero();
+            assertThat(countInInventoryOf(second)).isZero();
+
+            listener.returnEveryOpenSelector();
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("the first player's 3 must come back when the module unloads")
+                    .isEqualTo(3);
+            assertThat(countInInventoryOf(second))
+                    .as("every open selector is returned, not just the first one found")
+                    .isEqualTo(7);
+            assertThat(countInContentArea(PLACED))
+                    .as("the page must not keep a second copy")
+                    .isZero();
+            assertThat(secondPage.getInventory().getItem(0)).isNull();
+        }
+
+        @Test
+        @DisplayName("卸载后再收到关闭事件不得再归还一次")
+        void unloadingForgetsThePagesItReturnedSoACloseCannotDuplicateThem() {
+            placeItemInContentArea(0, 3);
+            assertThat(countInContentArea(PLACED)).isEqualTo(3);
+
+            listener.returnEveryOpenSelector();
+            assertThat(countInPlayerInventory(PLACED))
+                    .as("the unload return must have happened, otherwise this proves nothing")
+                    .isEqualTo(3);
+
+            tolerateKnownLibraryCloseIncompatibility(
+                    () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(view)));
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("a close event arriving after the unload return must not duplicate the item")
+                    .isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("没有打开中的选择界面时卸载是安全的空操作")
+        void unloadingWithNoOpenSelectorIsANoOp() {
+            tolerateKnownLibraryCloseIncompatibility(player::closeInventory);
+            assertThat(countInPlayerInventory(PLACED))
+                    .as("nothing was placed, so the close returned nothing")
+                    .isZero();
+
+            listener.returnEveryOpenSelector();
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED)).isZero();
+        }
+    }
+
+    @Nested
     @DisplayName("注解配置测试")
     class AnnotationTests {
 
