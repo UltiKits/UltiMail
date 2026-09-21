@@ -29,9 +29,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   their feet instead of vanishing (UltiKits/UltiMail#27).
 - The three other points where a mail attachment is handed back now also drop what no longer fits
   at the sender's feet instead of destroying it: the items above `max-items` when Confirm is
-  clicked, a content prompt that is cancelled or times out, and a send the server refuses (for
+  clicked, a content prompt that ends without sending, and a send the server refuses (for
   example an unknown receiver). Each of these previously discarded whatever the sender's inventory
   could not hold (UltiKits/UltiMail#27).
+- An attachment waiting at the content prompt is now given back whenever that prompt ends without
+  the mail being sent, however it ends: typing `cancel` in any capitalisation, the prompt's
+  120-second timeout, the sender leaving the server, or another plugin ending the prompt.
+  Previously only the exact lower-case word `cancel` gave it back. Typing `Cancel` or `CANCEL`
+  ended the prompt by a different route, printed nothing at all, and destroyed the attachment —
+  so a sender who held one copper ingot, ran `/sendmail <player> <subject> attach` and then typed
+  `Cancel` was left with no ingot, nothing on the ground and no mail. The sender is now also told
+  their send was cancelled on every one of those routes, instead of only some of them
+  (UltiKits/UltiMail#27).
 - 重载本模块（`/ul reload UltiMail`，或对所有模块执行 `/ul reload`）现在会重新读取 `config/mail.yml`
   并刷新语言文件，修改后的 `max-subject-length` 等配置无需重启即可对下一封邮件生效。此前本模块的
   重载方法替换了框架的重载方法且只输出一行日志，这两步都不会执行。UltiTools 6.3.0 还会在此时报告
@@ -45,8 +54,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   而 GUI 库打开界面时 holder 始终为空，因此归还物品的代码永远不会执行。现在物品只会被归还一次，
   发送者背包放不下的部分会掉落在其脚下，而不再消失（UltiKits/UltiMail#27）。
 - 另外三处归还邮件附件的位置现在同样会把放不下的物品掉落在发送者脚下，而不再销毁：点击"确认"时超出
-  `max-items` 的部分、内容输入被取消或超时、以及服务器拒绝发送（例如收件人不存在）。此前这三处都会
-  丢弃发送者背包容纳不下的物品（UltiKits/UltiMail#27）。
+  `max-items` 的部分、内容输入在未发送的情况下结束、以及服务器拒绝发送（例如收件人不存在）。此前这三处
+  都会丢弃发送者背包容纳不下的物品（UltiKits/UltiMail#27）。
+- 等在内容输入提示处的附件，现在只要该提示在邮件未发出的情况下结束就会被归还，无论以何种方式结束：
+  输入任意大小写的 `cancel`、该提示 120 秒超时、发送者离开服务器，或由其他插件结束该提示。此前只有
+  输入全小写的 `cancel` 才会归还。输入 `Cancel` 或 `CANCEL` 会走另一条路径结束该提示，既不输出任何
+  提示也会销毁附件——因此手持一个铜锭、执行 `/sendmail <玩家> <主题> attach` 后输入 `Cancel` 的发送者，
+  既拿不回铜锭，地上也没有掉落物，邮件同样不存在。现在上述每一条路径都会告知发送者发送已取消，而不再
+  只有其中一部分会告知（UltiKits/UltiMail#27）。
 
 ### Removed
 
