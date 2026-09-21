@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link AttachmentSelectorPage}.
@@ -352,6 +353,79 @@ class AttachmentSelectorPageTest {
                         + "is no inventory space, never destroyed")
                 .isEqualTo(1);
         assertThat(countInPlayerInventory(Material.IRON_INGOT)).isZero();
+    }
+
+    /**
+     * Gate 1 MN-01. {@code onConfirm} used to leave the items it KEPT sitting in their slots and
+     * rely on the {@code confirmed} flag to stop the close handler handing them back a second
+     * time -- so the module's system-level claim that "no path can give the same stack back twice"
+     * because "the content slot is emptied as its item is handed over" was true of
+     * {@link AttachmentSelectorPage#returnAllItems()} and of the excess branch, but not of the
+     * confirm path. Draining every slot it hands over makes the content area the single record of
+     * what the page still owes the player, which is what lets the flag go entirely.
+     */
+    @Test
+    @DisplayName("确认时应清空它交出的每一个槽位，使二次归还无从发生")
+    void confirmDrainsEveryContentSlotItHandsOver() {
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 5));
+        page.getInventory().setItem(1, new ItemStack(Material.IRON_INGOT, 2));
+        assertThat(page.getInventory().getItem(0))
+                .as("the items must really be in the page, otherwise this test proves nothing")
+                .isNotNull();
+
+        page.onConfirm(null);
+
+        assertThat(receivedItems.get())
+                .as("both placed stacks are inside the limit, so both must be handed onward")
+                .hasSize(2);
+        for (int slot = 0; slot < AttachmentSelectorPage.getContentSize(); slot++) {
+            assertThat(page.getInventory().getItem(slot))
+                    .as("slot %d must have been emptied as its item was handed over", slot)
+                    .isNull();
+        }
+
+        // The invariant the drained slots buy: the close, quit and unload paths all funnel into
+        // returnAllItems(), and after a confirm it must find nothing left to give.
+        page.returnAllItems();
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT) + countDroppedInWorld(Material.COPPER_INGOT))
+                .as("a confirmed selection belongs to the mail; returning it as well would duplicate it")
+                .isZero();
+        assertThat(countInPlayerInventory(Material.IRON_INGOT) + countDroppedInWorld(Material.IRON_INGOT))
+                .isZero();
+    }
+
+    /**
+     * Gate 1 MN-02. Draining the slots before the callback runs is what makes a second return
+     * impossible -- and it is also what would turn a throwing callback into item destruction,
+     * since the items are then in neither the page nor the mail. The confirm path therefore hands
+     * the kept items back if the callback did not complete. Without that compensation this test's
+     * items would exist nowhere at all.
+     */
+    @Test
+    @DisplayName("确认回调抛异常时应把已保留的物品归还，而不是让它们消失")
+    void aConfirmCallbackThatThrowsStillGivesTheKeptItemsBack() {
+        AttachmentSelectorPage throwingPage = new AttachmentSelectorPage(player, 27, plugin,
+                items -> {
+                    throw new IllegalStateException("the confirm callback blew up");
+                },
+                () -> { });
+        throwingPage.open();
+        throwingPage.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 4));
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT))
+                .as("the player must not already hold the item under test")
+                .isZero();
+
+        assertThatThrownBy(() -> throwingPage.onConfirm(null))
+                .as("a failing confirm callback is surfaced, not swallowed")
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT) + countDroppedInWorld(Material.COPPER_INGOT))
+                .as("the callback never took custody, so the items must be back with the player "
+                        + "rather than lost between the drained page and the mail that was never sent")
+                .isEqualTo(4);
+        assertThat(throwingPage.getInventory().getItem(0))
+                .as("and they must not ALSO still be in the page, which would duplicate them")
+                .isNull();
     }
 
     @Test

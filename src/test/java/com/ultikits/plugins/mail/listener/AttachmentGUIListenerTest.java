@@ -328,7 +328,6 @@ class AttachmentGUIListenerTest {
             // inventory, so a passing assertion below cannot be vacuous.
             assertThat(countInContentArea(PLACED)).isEqualTo(1);
             assertThat(countInPlayerInventory(PLACED)).isZero();
-            assertThat(page.isConfirmed()).isFalse();
 
             tolerateKnownLibraryCloseIncompatibility(player::closeInventory);
 
@@ -400,12 +399,14 @@ class AttachmentGUIListenerTest {
 
             clickToolbarIcon(okButtonSlot());
 
-            assertThat(page.isConfirmed())
-                    .as("the OK icon's own action must have run, otherwise this test is vacuous")
-                    .isTrue();
             assertThat(confirmedItems.get())
-                    .as("the placed item must have been handed to the confirm callback")
+                    .as("the OK icon's own action must have run and handed the placed item to the "
+                            + "confirm callback, otherwise this test is vacuous")
                     .isNotNull();
+            assertThat(countInContentArea(PLACED))
+                    .as("confirming drains the slots it hands over, and that -- not a flag -- is "
+                            + "what makes the close below unable to return the item again")
+                    .isZero();
 
             tolerateKnownLibraryCloseIncompatibility(
                     () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(view)));
