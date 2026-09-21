@@ -726,8 +726,8 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("acceptInput 发送失败且携带附件时应将附件退还给发送者")
-        void shouldReturnAttachmentsToSenderOnFailure() throws Exception {
+        @DisplayName("acceptInput 发送被拒绝时应保留附件托管，交由对话结束时统一归还")
+        void shouldKeepCustodyOfTheAttachmentWhenTheSendIsRefused() throws Exception {
             Class<?> contentPromptClass = Class.forName(
                 "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
             );
@@ -735,9 +735,7 @@ class SendMailCommandTest {
                 String.class, String.class).newInstance("ReceiverName", "TestSubject");
 
             ItemStack diamond = mock(ItemStack.class);
-            when(diamond.getType()).thenReturn(Material.DIAMOND);
             ItemStack goldIngot = mock(ItemStack.class);
-            when(goldIngot.getType()).thenReturn(Material.GOLD_INGOT);
             ItemStack[] attachItems = new ItemStack[]{diamond, goldIngot};
 
             org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
@@ -759,15 +757,53 @@ class SendMailCommandTest {
             // MailService.sendMail(...) never persists attachments on a false return -- none of
             // its five refusal branches touch `items`. The GUI allows up to 45 selected items
             // while MailConfig.maxItems defaults to 27, so selecting 28-45 items is guaranteed to
-            // hit the "too many items" refusal and, before this fix, silently destroy every item
-            // the sender had staked. acceptInput is the only place that still holds a reference
-            // to `items` after MailService.sendMail(...) declines them.
+            // hit the "too many items" refusal.
             //
-            // Both items go back in ONE addItem(...) call (the shared ItemReturns#giveOrDrop
-            // path), which is also what lets identical stacks merge; what that call could not fit
-            // is dropped rather than discarded, asserted against real inventory state in
-            // SendMailCommandConversationIntegrationTest rather than against this mock.
-            verify(senderInventory).addItem(diamond, goldIngot);
+            // acceptInput used to hand the items back here itself. It no longer does, and that is
+            // the point of gate-1 BL-01's fix: there is exactly ONE place this module returns a
+            // conversation's attachment -- the abandonment settlement -- and what routes an item
+            // there is the conversation's custody record staying set. So what this test pins is
+            // that a refusal does NOT clear custody and does NOT hand anything over itself; the
+            // hand-over is asserted against real inventory state in
+            // SendMailCommandConversationIntegrationTest.
+            verify(ctx, never()).setSessionData(eq("attachItems"), any());
+            verify(senderInventory, never()).addItem(any(ItemStack[].class));
+            verify(senderInventory, never()).addItem(any(ItemStack.class));
+        }
+
+        @Test
+        @DisplayName("acceptInput 发送成功时应清除附件托管，避免结束时再归还一次")
+        void shouldReleaseCustodyOfTheAttachmentWhenTheSendSucceeds() throws Exception {
+            Class<?> contentPromptClass = Class.forName(
+                "com.ultikits.plugins.mail.commands.SendMailCommand$ContentPrompt"
+            );
+            Object prompt = contentPromptClass.getDeclaredConstructor(
+                String.class, String.class).newInstance("ReceiverName", "TestSubject");
+
+            ItemStack diamond = mock(ItemStack.class);
+            ItemStack[] attachItems = new ItemStack[]{diamond};
+
+            org.bukkit.conversations.ConversationContext ctx = mock(org.bukkit.conversations.ConversationContext.class);
+            when(ctx.getForWhom()).thenReturn(sender);
+            when(ctx.getSessionData("mailService")).thenReturn(mockMailService);
+            when(ctx.getSessionData("attachItems")).thenReturn(attachItems);
+
+            UltiToolsPlugin ctxPlugin = TestHelper.mockUltiToolsPlugin();
+            when(ctx.getSessionData("ultiPlugin")).thenReturn(ctxPlugin);
+
+            when(mockMailService.sendMail(any(Player.class), anyString(), anyString(), anyString(), eq(attachItems)))
+                .thenReturn(true);
+
+            Method acceptInput = contentPromptClass.getDeclaredMethod("acceptInput",
+                org.bukkit.conversations.ConversationContext.class, String.class);
+
+            acceptInput.invoke(prompt, ctx, "邮件内容");
+
+            // The mail owns the items now. Clearing the custody entry is the ONE thing that stops
+            // the abandonment settlement -- which runs a moment later, because acceptInput returns
+            // END_OF_CONVERSATION -- from handing a second copy back. The refusal test above is the
+            // negative control for exactly this call.
+            verify(ctx).setSessionData("attachItems", null);
         }
 
         @Test
@@ -885,8 +921,36 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("会话被正常放弃时不应归还附件")
-        void shouldNotReturnItemsWhenAbandonedGracefully() {
+        @DisplayName("会话以「优雅退出」结束但仍托管附件时也必须归还（BL-01 的直接回归守卫）")
+        void shouldReturnItemsWhenAbandonedGracefullyWhileStillHoldingThem() {
+            when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
+            ItemStack diamond = mock(ItemStack.class);
+            when(diamond.getType()).thenReturn(Material.DIAMOND);
+            ItemStack clonedDiamond = mock(ItemStack.class);
+            when(diamond.clone()).thenReturn(clonedDiamond);
+            when(clonedDiamond.getType()).thenReturn(Material.DIAMOND);
+            when(senderInventory.getItemInMainHand()).thenReturn(diamond);
+
+            command.sendMailWithItems(sender, "receiver", "subject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            // The no-canceller constructor is what Conversation#outputNextPrompt uses when a
+            // prompt returns END_OF_CONVERSATION, so ConversationAbandonedEvent#gracefulExit() --
+            // literally `return canceller == null` -- is true here. That used to be the condition
+            // the return sat behind, which is exactly how typing `Cancel` destroyed an attachment
+            // while `cancel` did not. Ending while still holding the items must return them
+            // whatever ended the conversation.
+            conversation.abandon(new ConversationAbandonedEvent(conversation));
+
+            verify(senderInventory).addItem(clonedDiamond);
+        }
+
+        @Test
+        @DisplayName("附件托管已被清除后结束会话不得再归还（否则附件被复制）")
+        void shouldNotReturnItemsOnceCustodyHasBeenReleased() {
             when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
             ItemStack diamond = mock(ItemStack.class);
             when(diamond.getType()).thenReturn(Material.DIAMOND);
@@ -900,11 +964,18 @@ class SendMailCommandTest {
             verify(sender).beginConversation(captor.capture());
             Conversation conversation = captor.getValue();
 
-            // No canceller -> gracefulExit() is true -> the listener's early-return
-            // branch is taken and nothing is added back to the inventory.
+            // Pre-assertion: custody really was set, so clearing it below is a real state change
+            // and this test cannot pass because the items were never there.
+            assertThat(conversation.getContext().getSessionData("attachItems"))
+                .as("the conversation must be holding the attachment before custody is released")
+                .isNotNull();
+
+            // What ContentPrompt.acceptInput does on a successful send.
+            conversation.getContext().setSessionData("attachItems", null);
             conversation.abandon(new ConversationAbandonedEvent(conversation));
 
             verify(senderInventory, never()).addItem(any(ItemStack.class));
+            verify(senderInventory, never()).addItem(any(ItemStack[].class));
         }
     }
 
@@ -928,8 +999,8 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("会话被非正常放弃时应通知发送者已取消")
-        void shouldNotifySenderWhenAbandonedUngracefully() {
+        @DisplayName("会话在有取消器的情况下结束时应通知发送者已取消")
+        void shouldNotifySenderWhenTheConversationEndsWithACanceller() {
             command.sendMail(sender, "ReceiverName", "TestSubject");
 
             ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
@@ -944,14 +1015,37 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("会话被正常放弃时不应通知取消")
-        void shouldNotNotifyWhenAbandonedGracefully() {
+        @DisplayName("会话以「优雅退出」结束且未作出发送裁决时也应通知已取消")
+        void shouldNotifySenderWhenTheConversationEndsWithoutASendDecision() {
             command.sendMail(sender, "ReceiverName", "TestSubject");
 
             ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
             verify(sender).beginConversation(captor.capture());
             Conversation conversation = captor.getValue();
 
+            // gracefulExit() is true for the no-canceller constructor, and this used to be the
+            // silent case -- typing `Cancel` ended the conversation here and said nothing at all.
+            // The discriminator is now whether a send decision was reached, not whether Bukkit
+            // happened to attach a canceller.
+            conversation.abandon(new ConversationAbandonedEvent(conversation));
+
+            verify(sender).sendRawMessage(ArgumentMatchers.<String>argThat(msg ->
+                msg.contains("[send_cancelled]")));
+        }
+
+        @Test
+        @DisplayName("发送裁决已通知发送者后结束会话不应再通知已取消")
+        void shouldNotNotifyWhenTheOutcomeHasAlreadyBeenReported() {
+            command.sendMail(sender, "ReceiverName", "TestSubject");
+
+            ArgumentCaptor<Conversation> captor = ArgumentCaptor.forClass(Conversation.class);
+            verify(sender).beginConversation(captor.capture());
+            Conversation conversation = captor.getValue();
+
+            // What ContentPrompt.acceptInput records once MailService has either sent the mail or
+            // explained why it refused; the end-to-end forms of both are in
+            // SendMailCommandConversationIntegrationTest.
+            conversation.getContext().setSessionData("outcomeReported", Boolean.TRUE);
             conversation.abandon(new ConversationAbandonedEvent(conversation));
 
             verify(sender, never()).sendRawMessage(any(String.class));
