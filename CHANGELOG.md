@@ -20,6 +20,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and its listeners stop firing; this module has no unload work of its own. Previously this module's
   unload method replaced the framework's and only logged a line, so after `/upm uninstall UltiMail`
   both its commands and its listeners stayed active until the server restarted (UltiKits/UltiMail#20).
+- An item placed in the attachment selector is now given back when that GUI is closed without
+  clicking Confirm — the selector reached by `/sendmail <player> <subject> attach` for a sender
+  holding `ultimail.admin.multiattach`, and by `/mail sendall <content> items`. Previously the item
+  was destroyed: the module recognised the closing page by the inventory's holder, which the GUI
+  library always leaves empty, so the code that gives items back could never run. The items come
+  back exactly once, and any stack the sender's inventory no longer has room for is dropped at
+  their feet instead of vanishing (UltiKits/UltiMail#27).
+- The three other points where a mail attachment is handed back now also drop what no longer fits
+  at the sender's feet instead of destroying it: the items above `max-items` when Confirm is
+  clicked, a content prompt that is cancelled or times out, and a send the server refuses (for
+  example an unknown receiver). Each of these previously discarded whatever the sender's inventory
+  could not hold (UltiKits/UltiMail#27).
 - 重载本模块（`/ul reload UltiMail`，或对所有模块执行 `/ul reload`）现在会重新读取 `config/mail.yml`
   并刷新语言文件，修改后的 `max-subject-length` 等配置无需重启即可对下一封邮件生效。此前本模块的
   重载方法替换了框架的重载方法且只输出一行日志，这两步都不会执行。UltiTools 6.3.0 还会在此时报告
@@ -27,6 +39,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 卸载本模块（`/upm uninstall UltiMail`）现在会先由框架注销命令，再注销监听器，本模块的命令会被真正移除，
   其监听器也不再触发；本模块自身没有卸载工作。此前本模块的卸载方法替换了框架的卸载方法且只输出一行日志，
   因此执行 `/upm uninstall UltiMail` 后，其命令和监听器都会保持生效，直到服务器重启（UltiKits/UltiMail#20）。
+- 放入附件选择界面的物品在未点击"确认"就关闭该界面时会被归还——该界面可由持有
+  `ultimail.admin.multiattach` 的发送者执行 `/sendmail <玩家> <主题> attach`，或执行
+  `/mail sendall <内容> items` 打开。此前物品会被销毁：模块通过容器 holder 判断关闭的是哪个界面，
+  而 GUI 库打开界面时 holder 始终为空，因此归还物品的代码永远不会执行。现在物品只会被归还一次，
+  发送者背包放不下的部分会掉落在其脚下，而不再消失（UltiKits/UltiMail#27）。
+- 另外三处归还邮件附件的位置现在同样会把放不下的物品掉落在发送者脚下，而不再销毁：点击"确认"时超出
+  `max-items` 的部分、内容输入被取消或超时、以及服务器拒绝发送（例如收件人不存在）。此前这三处都会
+  丢弃发送者背包容纳不下的物品（UltiKits/UltiMail#27）。
 
 ### Removed
 

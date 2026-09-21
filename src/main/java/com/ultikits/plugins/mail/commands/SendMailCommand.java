@@ -2,6 +2,7 @@ package com.ultikits.plugins.mail.commands;
 
 import com.ultikits.plugins.mail.gui.AttachmentSelectorPage;
 import com.ultikits.plugins.mail.service.MailService;
+import com.ultikits.plugins.mail.util.ItemReturns;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.abstracts.command.BaseCommandExecutor;
 import com.ultikits.ultitools.annotations.Autowired;
@@ -121,15 +122,13 @@ public class SendMailCommand extends BaseCommandExecutor {
             .addConversationAbandonedListener(event -> {
                 if (!event.gracefulExit()) {
                     event.getContext().getForWhom().sendRawMessage(ChatColor.RED + i18n("send_cancelled"));
-                    // Return items if conversation cancelled
+                    // Return items if conversation cancelled. The sender may well have filled
+                    // their inventory while typing, so anything that no longer fits is dropped at
+                    // their feet rather than discarded (UltiKits/UltiMail#27's defect class).
                     ItemStack[] attachedItems = (ItemStack[]) event.getContext().getSessionData("attachItems");
                     if (attachedItems != null) {
                         Player player = (Player) event.getContext().getForWhom();
-                        for (ItemStack item : attachedItems) {
-                            if (item != null && !item.getType().isAir()) {
-                                player.getInventory().addItem(item);
-                            }
-                        }
+                        ItemReturns.giveOrDrop(player, attachedItems);
                     }
                 }
             });
@@ -208,12 +207,9 @@ public class SendMailCommand extends BaseCommandExecutor {
                 // that still holds a reference to them. The GUI attachment path defaults to 45
                 // selectable slots while MailConfig.maxItems defaults to 27, so selecting
                 // 28-45 items is guaranteed to hit the "too many items" refusal and previously
-                // destroyed every selected item silently.
-                for (ItemStack item : items) {
-                    if (item != null && !item.getType().isAir()) {
-                        sender.getInventory().addItem(item);
-                    }
-                }
+                // destroyed every selected item silently. Anything the sender's inventory can no
+                // longer hold is dropped at their feet rather than discarded.
+                ItemReturns.giveOrDrop(sender, items);
             }
 
             return Prompt.END_OF_CONVERSATION;
