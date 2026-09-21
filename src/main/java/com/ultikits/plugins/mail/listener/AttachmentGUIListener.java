@@ -180,7 +180,13 @@ public class AttachmentGUIListener implements Listener {
                 continue;
             }
             // The return comes first and unconditionally: it is the invariant, and closing the
-            // inventory below is only cosmetic.
+            // inventory below is only cosmetic. Note that the remove(...) above is deliberately
+            // belt-and-braces: closeQuietly's own InventoryCloseEvent reaches this class's
+            // LOWEST-priority close handler, which drops the same entry -- so either mechanism
+            // alone suffices and neither is independently observable (measured:
+            // UltiMail-27-INDEPENDENCE-unload-tracking-removal.log). Doing it here as well keeps
+            // this method correct if the close never fires, and stops the nested close handler
+            // re-entering returnAllItems() on a page already settled by this loop.
             page.returnAllItems();
             closeQuietly(page);
         }

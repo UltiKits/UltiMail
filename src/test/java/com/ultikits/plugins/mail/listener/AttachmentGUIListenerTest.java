@@ -706,17 +706,11 @@ class AttachmentGUIListenerTest {
                     .as("the unload return must have happened, otherwise this proves nothing")
                     .isEqualTo(3);
 
-            tolerateKnownLibraryCloseIncompatibility(
-                    () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(view)));
-
-            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
-                    .as("a close event arriving after the unload return must not duplicate the item")
-                    .isEqualTo(3);
-
             // The tracking entry really is gone, not merely emptied of consequence: a page this
             // listener has already settled and closed is no longer its business, so anything that
-            // ends up in that inventory afterwards is not its to hand out. Without the removal the
-            // second unload below would give the extra stack away too.
+            // ends up in that inventory afterwards is not its to hand out. This is asserted BEFORE
+            // the close event below, because the close handler drops the entry too and would
+            // otherwise cover for a missing removal here.
             page.getInventory().setItem(0, new ItemStack(PLACED, 9));
             listener.returnEveryOpenSelector();
 
@@ -727,6 +721,14 @@ class AttachmentGUIListenerTest {
             assertThat(countInContentArea(PLACED))
                     .as("and that later stack must be left exactly where it was put")
                     .isEqualTo(9);
+
+            tolerateKnownLibraryCloseIncompatibility(
+                    () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(view)));
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("a close event arriving after the unload return must not hand the owner "
+                            + "anything from a page the unload already settled")
+                    .isEqualTo(3);
         }
 
         @Test
