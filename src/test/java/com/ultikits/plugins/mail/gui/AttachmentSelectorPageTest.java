@@ -428,6 +428,59 @@ class AttachmentSelectorPageTest {
                 .isNull();
     }
 
+    /**
+     * Gate 1 MJ-01. The checklist row for this page asserted that "a shift-click INTO the content
+     * area while it has room is deliberately allowed, not guarded". Measured here: it is cancelled,
+     * and not by anything this module wrote. A shift-click originating in the player's own inventory
+     * has its raw slot in the BOTTOM inventory, so {@link AttachmentSelectorPage#onClick} reports
+     * unhandled ({@code rawSlot >= 0 && rawSlot < CONTENT_SIZE} is false), and the library's
+     * {@code InvListener#onClick} then takes its {@code getSlot() != getRawSlot()} branch and
+     * cancels {@code MOVE_TO_OTHER_INVENTORY} outright.
+     * <p>
+     * The free content slot asserted first is the positive control: "while it has room" really did
+     * hold, and the click was cancelled anyway -- so this is not a full-page artefact.
+     */
+    @Test
+    @DisplayName("从玩家背包 shift-click 放入内容区域会被取消（MJ-01：与文档此前的说法相反）")
+    void shiftClickPlacementFromThePlayerInventoryIsCancelled() {
+        InventoryView view = player.getOpenInventory();
+        assertThat(view.getTopInventory().firstEmpty())
+                .as("a content slot must really be free, so 'while it has room' holds and this test "
+                        + "is not measuring a full page")
+                .isBetween(0, AttachmentSelectorPage.getContentSize() - 1);
+
+        InventoryClickEvent event = new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER,
+                view.getTopInventory().getSize() + 4, ClickType.SHIFT_LEFT,
+                InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled())
+                .as("the GUI library cancels MOVE_TO_OTHER_INVENTORY for any bottom-inventory slot "
+                        + "this page does not handle, so shift-click placement does not work -- the "
+                        + "only way to place an attachment is a plain pick-up-and-place click")
+                .isTrue();
+    }
+
+    /**
+     * The other half of MJ-01's note: removal by shift-click DOES work, because the raw slot is
+     * then inside the content area and this page reports the click handled. Kept next to the test
+     * above so the asymmetry the documents now state is visible in one place.
+     */
+    @Test
+    @DisplayName("从内容区域 shift-click 取出物品不会被取消")
+    void shiftClickRemovalOutOfTheContentAreaIsNotCancelled() {
+        page.getInventory().setItem(7, new ItemStack(Material.DIAMOND));
+
+        InventoryClickEvent event = topInventoryClickEvent(7, ClickType.SHIFT_LEFT,
+                InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled())
+                .as("the raw slot is inside the content area, so this page reports the click handled "
+                        + "and the library leaves it alone")
+                .isFalse();
+    }
+
     @Test
     @DisplayName("拖拽放置到附件槽位仍会被取消（未修复的已知限制）")
     void dragPlacementIntoContentAreaStillCancelled() {
