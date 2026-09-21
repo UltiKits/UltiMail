@@ -32,6 +32,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   clicked, a content prompt that ends without sending, and a send the server refuses (for
   example an unknown receiver). Each of these previously discarded whatever the sender's inventory
   could not hold (UltiKits/UltiMail#27).
+- Unloading this module (`/upm uninstall UltiMail`) now hands back every item still sitting in an
+  open attachment selector, and closes that selector, before the module stops listening. Previously
+  those items were destroyed: the code that gives them back runs from an inventory-close event, and
+  unloading the module unregisters its listeners, so no close event could reach it. An item placed
+  in that GUI exists only in memory until the mail is created, which is why there was nothing to
+  recover afterwards (UltiKits/UltiMail#27).
 - An attachment waiting at the content prompt is now given back whenever that prompt ends without
   the mail being sent, however it ends: typing `cancel` in any capitalisation, the prompt's
   120-second timeout, the sender leaving the server, or another plugin ending the prompt.
@@ -56,6 +62,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 另外三处归还邮件附件的位置现在同样会把放不下的物品掉落在发送者脚下，而不再销毁：点击"确认"时超出
   `max-items` 的部分、内容输入在未发送的情况下结束、以及服务器拒绝发送（例如收件人不存在）。此前这三处
   都会丢弃发送者背包容纳不下的物品（UltiKits/UltiMail#27）。
+- 卸载本模块（`/upm uninstall UltiMail`）现在会在模块停止监听之前，把仍留在打开着的附件选择界面中的
+  每一件物品归还发送者，并关闭该界面。此前这些物品会被销毁：归还物品的代码由容器关闭事件触发，而卸载
+  模块会注销其监听器，因此不会有任何关闭事件到达它。放入该界面的物品在邮件创建之前只存在于内存中，
+  所以事后也无从恢复（UltiKits/UltiMail#27）。
 - 等在内容输入提示处的附件，现在只要该提示在邮件未发出的情况下结束就会被归还，无论以何种方式结束：
   输入任意大小写的 `cancel`、该提示 120 秒超时、发送者离开服务器，或由其他插件结束该提示。此前只有
   输入全小写的 `cancel` 才会归还。输入 `Cancel` 或 `CANCEL` 会走另一条路径结束该提示，既不输出任何
