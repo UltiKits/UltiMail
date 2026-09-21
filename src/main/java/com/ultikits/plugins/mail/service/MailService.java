@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
+import com.ultikits.plugins.mail.util.ItemReturns;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.PostConstruct;
@@ -370,14 +371,13 @@ public class MailService {
             return new ItemStack[0];
         }
         
-        // Give items to player
-        HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(items);
-        
-        // Drop overflow items (should not happen if caller checked space)
-        for (ItemStack item : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), item);
-        }
-        
+        // Hand the attachment over through the module's one return helper rather than repeating its
+        // addItem/dropItemNaturally pair here: ItemReturns#giveOrDrop declares itself the single
+        // place this module hands items back, and it also skips the null and air entries a stored
+        // Base64 payload round-trips faithfully -- passing those straight to Inventory#addItem threw
+        // out of this method and aborted the whole claim.
+        ItemReturns.giveOrDrop(player, items);
+
         // Mark as claimed
         mail.setClaimed(true);
         try {

@@ -12,12 +12,17 @@ import java.util.Map;
  * <p>
  * {@code Inventory#addItem} returns the stacks it could not fit. Every call site that discards
  * that return value destroys those items whenever the player's inventory happens to be full --
- * the defect class behind {@code UltiKits/UltiMail#27}. Routing every attachment return through
- * this class means a stack that no longer fits is dropped at the player's feet instead, which is
- * also what {@code MailService#claimItems} already did for claimed mail attachments.
+ * the defect class behind {@code UltiKits/UltiMail#27}. Routing every return through this class
+ * means a stack that no longer fits is dropped at the player's feet instead.
+ * <p>
+ * "Single place" is meant literally, and is checkable: {@code grep -rn "addItem\|dropItem"
+ * src/main/java} finds no hand-over outside this class. {@code MailService#claimItems} used to
+ * repeat the same pair by hand while this javadoc claimed otherwise, so it was routed here too --
+ * which also fixed a failure the duplicate had of its own: it passed its raw deserialized array
+ * to {@code addItem}, and a stored empty slot then threw out of the claim.
  *
  * @author wisdomme
- * @version 1.0.0
+ * @version 1.1.0
  */
 public final class ItemReturns {
 
