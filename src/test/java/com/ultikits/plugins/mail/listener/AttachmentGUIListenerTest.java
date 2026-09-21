@@ -74,14 +74,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link EventPriority#LOWEST}, ahead of the library's throwing handler, which is why the
  * assertions still hold under MockBukkit's stricter dispatch.
  * <p>
- * <b>Why there is no "a click in another inventory is ignored" test.</b> This listener's click
- * handler has exactly one cancelling branch, and that branch is the one
- * {@code UltiKits/UltiMail#26} records as unreachable (the toolbar row is fully occupied from the
- * moment the page opens, so {@code firstEmpty()} can never return a toolbar index). Whether the
- * handler runs or not therefore has no observable effect on a click, so any such test would pass
- * vacuously. Cancellation inside the page itself is decided by the library from
- * {@code AttachmentSelectorPage#onClick}'s return value and is covered by
- * {@code AttachmentSelectorPageTest}.
+ * <b>What the click tests can and cannot prove.</b> This listener's click handler has exactly one
+ * cancelling branch, and that branch is the one {@code UltiKits/UltiMail#26} records as unreachable
+ * (the toolbar row is fully occupied from the moment the page opens, so {@code firstEmpty()} can
+ * never return a toolbar index). Whether that handler runs therefore has no observable effect on a
+ * click at all, so {@code ClickHandlerTests} states exactly that -- it pins "this handler cancels
+ * nothing" per branch rather than pretending to prove a guard that cannot fire. Cancellation inside
+ * the page is the library's decision, taken from {@code AttachmentSelectorPage#onClick}'s return
+ * value, and is covered by {@code AttachmentSelectorPageTest}.
  */
 @DisplayName("AttachmentGUIListener 测试")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
@@ -221,6 +221,75 @@ class AttachmentGUIListenerTest {
                     .as("the page's own inventory must be the one the player has open, which is "
                             + "the only identity this listener can rely on")
                     .isSameAs(page.getInventory());
+        }
+
+        /**
+         * A second player with a page in the state {@code Gui#open()} leaves behind just before
+         * the inventory-open event is fired: registered in the library's registry, inventory
+         * created. The open event itself is then fired by the caller, which is what lets these two
+         * tests differ in exactly one respect -- whether that event was cancelled. The event is
+         * fired through the real plugin manager rather than handed to the handler directly, so
+         * these tests never name a method the pre-fix listener did not have.
+         */
+        private AttachmentSelectorPage pageAwaitingItsOpenEvent(PlayerMock owner) {
+            AttachmentSelectorPage owned = new AttachmentSelectorPage(owner, 27,
+                    TestHelper.getMockPlugin(), items -> { }, () -> { });
+            owned.setInventory(Bukkit.createInventory(null, 54, "awaiting open"));
+            InventoryAPI.getInstance().getPlayers().put(owner.getUniqueId(), owned);
+            owned.getInventory().setItem(0, new ItemStack(PLACED, 1));
+            return owned;
+        }
+
+        @Test
+        @DisplayName("未被取消的打开事件会被追踪，关闭时归还")
+        void anUncancelledOpenIsTrackedAndReturnsOnClose() {
+            PlayerMock owner = server.addPlayer("second-tester");
+            AttachmentSelectorPage owned = pageAwaitingItsOpenEvent(owner);
+            InventoryView ownedView = new PlayerInventoryViewMock(owner, owned.getInventory());
+
+            Bukkit.getPluginManager().callEvent(new InventoryOpenEvent(ownedView));
+            tolerateKnownLibraryCloseIncompatibility(
+                    () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(ownedView)));
+
+            assertThat(owned.getInventory().getItem(0))
+                    .as("a tracked page hands its item back when it closes")
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("被取消的打开事件不会被追踪")
+        void aCancelledOpenIsNotTracked() {
+            PlayerMock owner = server.addPlayer("third-tester");
+            AttachmentSelectorPage owned = pageAwaitingItsOpenEvent(owner);
+            InventoryView ownedView = new PlayerInventoryViewMock(owner, owned.getInventory());
+
+            InventoryOpenEvent openEvent = new InventoryOpenEvent(ownedView);
+            openEvent.setCancelled(true);
+            Bukkit.getPluginManager().callEvent(openEvent);
+            tolerateKnownLibraryCloseIncompatibility(
+                    () -> Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(ownedView)));
+
+            assertThat(owned.getInventory().getItem(0))
+                    .as("an inventory that never actually opened is not tracked, so its close is "
+                            + "not this listener's business -- the only difference from the test "
+                            + "above is the cancellation")
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName("打开普通容器不会被误认为附件选择界面")
+        void openingAnOrdinaryContainerIsNotMistakenForTheSelector() {
+            PlayerMock bystander = server.addPlayer("fourth-tester");
+            Inventory chest = Bukkit.createInventory(null, 27, "a chest");
+            InventoryView chestView = bystander.openInventory(chest);
+            chest.setItem(0, new ItemStack(PLACED, 1));
+
+            Bukkit.getPluginManager().callEvent(new InventoryCloseEvent(chestView));
+
+            assertThat(chest.getItem(0))
+                    .as("closing an ordinary container must not drain it")
+                    .isNotNull();
+            assertThat(countInPlayerInventory(PLACED)).isZero();
         }
 
         @Test
@@ -403,8 +472,110 @@ class AttachmentGUIListenerTest {
     }
 
     @Nested
+    @DisplayName("点击处理器的实际效果：什么都不取消")
+    class ClickHandlerTests {
+
+        /**
+         * These four cases characterise what the click handler actually does now that it is
+         * reachable at all: nothing observable. Its only cancelling branch is the one
+         * {@code UltiKits/UltiMail#26} records as unreachable -- the toolbar row is fully occupied
+         * from the moment the page opens (verified: {@code Gui#addItem} writes each icon straight
+         * into the inventory), so {@code firstEmpty()} can only ever return a content-area index
+         * or {@code -1}, never a toolbar index. The handler is invoked directly here, because what
+         * is being pinned is that IT touches nothing; cancellation inside the page is the library's
+         * decision from {@code AttachmentSelectorPage#onClick} and is covered by
+         * {@code AttachmentSelectorPageTest}. When #26 is fixed, the third case below is the one
+         * that must change.
+         */
+        private InventoryClickEvent clickEvent(int rawSlot, ClickType type, InventoryAction action) {
+            return new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, rawSlot, type,
+                    action);
+        }
+
+        @Test
+        @DisplayName("内容区域的点击不被本处理器取消")
+        void aContentAreaClickIsLeftAlone() {
+            InventoryClickEvent event = clickEvent(0, ClickType.LEFT, InventoryAction.PLACE_ALL);
+            listener.onInventoryClick(event);
+            assertThat(event.isCancelled()).isFalse();
+        }
+
+        @Test
+        @DisplayName("工具栏槽位的普通点击不被本处理器取消（由库自行取消）")
+        void aPlainToolbarClickIsLeftAloneByThisHandler() {
+            InventoryClickEvent event = clickEvent(okButtonSlot(), ClickType.LEFT,
+                    InventoryAction.PICKUP_ALL);
+            listener.onInventoryClick(event);
+            assertThat(event.isCancelled())
+                    .as("the toolbar is protected by the library's own default, not by this handler")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("从玩家背包 shift-click：#26 记录的守卫条件仍无法成立")
+        void aShiftClickFromThePlayerInventoryStillCannotTripTheToolbarGuard() {
+            InventoryClickEvent event = clickEvent(view.getTopInventory().getSize() + 5,
+                    ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+
+            assertThat(view.getTopInventory().firstEmpty())
+                    .as("the guard reads firstEmpty(), and with the toolbar pre-filled and the "
+                            + "content area empty it can only answer with a content-area index")
+                    .isBetween(0, AttachmentSelectorPage.getContentSize() - 1);
+
+            listener.onInventoryClick(event);
+
+            assertThat(event.isCancelled())
+                    .as("UltiKits/UltiMail#26: this guard cannot fire, and this fix does not "
+                            + "change that")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("另一个容器中的点击被本处理器忽略")
+        void aClickInAnotherInventoryIsIgnored() {
+            Inventory chest = Bukkit.createInventory(null, 27, "a chest");
+            InventoryClickEvent event = new InventoryClickEvent(
+                    new PlayerInventoryViewMock(player, chest), InventoryType.SlotType.CONTAINER,
+                    5, ClickType.LEFT, InventoryAction.PLACE_ALL);
+
+            listener.onInventoryClick(event);
+
+            assertThat(event.isCancelled()).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("拖拽仍受工具栏保护")
     class DragTests {
+
+        @Test
+        @DisplayName("只落在内容区域的拖拽不被本处理器取消")
+        void aDragConfinedToTheContentAreaIsLeftAloneByThisHandler() {
+            ItemStack dragged = new ItemStack(PLACED, 1);
+            InventoryDragEvent event = new InventoryDragEvent(view, null, dragged, false,
+                    Collections.singletonMap(3, dragged));
+
+            listener.onInventoryDrag(event);
+
+            assertThat(event.isCancelled())
+                    .as("this handler only guards the toolbar; the library's own default is what "
+                            + "cancels a drag into the page (see this nest's cancel test)")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("另一个容器中的拖拽被本处理器忽略")
+        void aDragInAnotherInventoryIsIgnored() {
+            Inventory chest = Bukkit.createInventory(null, 27, "a chest");
+            ItemStack dragged = new ItemStack(PLACED, 1);
+            InventoryDragEvent event = new InventoryDragEvent(
+                    new PlayerInventoryViewMock(player, chest), null, dragged, false,
+                    Collections.singletonMap(50, dragged));
+
+            listener.onInventoryDrag(event);
+
+            assertThat(event.isCancelled()).isFalse();
+        }
 
         /**
          * A guard on the observable property the checklist row claims, deliberately NOT a proof
