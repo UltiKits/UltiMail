@@ -1,5 +1,6 @@
 package com.ultikits.plugins.mail.gui;
 
+import com.ultikits.plugins.mail.util.ItemReturns;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.abstracts.gui.BaseConfirmationPage;
 import com.ultikits.ultitools.entities.Colors;
@@ -13,7 +14,9 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -39,7 +42,6 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
     private final UltiToolsPlugin plugin;
     private final Consumer<ItemStack[]> onConfirmCallback;
     private final Runnable onCancelCallback;
-    private boolean confirmed = false;
 
     /**
      * Creates a new attachment selector page.
@@ -107,30 +109,64 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
         return ChatColor.RED + i18n("send_cancel_attachments");
     }
     
+    /**
+     * Hands the selection to the confirm callback, keeping at most {@code maxItems} of it and
+     * giving the rest back.
+     * <p>
+     * <b>Every slot this method hands over is emptied before anything leaves the page.</b> The
+     * content area is this page's record of what it still owes the player, so draining it is what
+     * makes a second return impossible -- and it is why this class needs no "already settled"
+     * flag: {@link #returnAllItems()} reached afterwards by a close, a quit or a module unload
+     * finds nothing left to give. The flag this class used to carry was set by {@link #onCancel}
+     * as well as by a confirm, so it answered "confirmed" for a page the player had cancelled;
+     * once the close and quit handlers began reading it that mislabel was load-bearing, and
+     * draining the kept slots removes the need for it entirely.
+     * <p>
+     * Draining first is also what makes a failing callback dangerous, since the items are then in
+     * neither the page nor a mail -- so if the callback does not complete, the kept items are
+     * handed back before its failure propagates.
+     *
+     * @param event the click on the confirm icon; unused, the selection is read from the page
+     */
     @Override
     protected void onConfirm(InventoryClickEvent event) {
-        confirmed = true;
-        List<ItemStack> items = collectItems();
-        
+        Map<Integer, ItemStack> placed = collectPlacedItems();
+        List<Integer> slots = new ArrayList<>(placed.keySet());
+        List<ItemStack> items = new ArrayList<>(placed.values());
+
+        List<ItemStack> excess = new ArrayList<>();
         if (items.size() > maxItems) {
-            // Return excess items to player
             player.sendMessage(ChatColor.YELLOW + i18n("send_items_too_many")
                 .replace("{0}", String.valueOf(maxItems)));
-            for (int i = maxItems; i < items.size(); i++) {
-                player.getInventory().addItem(items.get(i));
-            }
-            items = items.subList(0, maxItems);
+            excess.addAll(items.subList(maxItems, items.size()));
+            items = new ArrayList<>(items.subList(0, maxItems));
         }
-        
-        if (onConfirmCallback != null) {
-            ItemStack[] result = items.isEmpty() ? null : items.toArray(new ItemStack[0]);
-            onConfirmCallback.accept(result);
+
+        for (Integer slot : slots) {
+            getInventory().setItem(slot, null);
+        }
+
+        if (!excess.isEmpty()) {
+            ItemReturns.giveOrDrop(player, excess.toArray(new ItemStack[0]));
+        }
+
+        List<ItemStack> kept = items;
+        boolean handedOver = false;
+        try {
+            if (onConfirmCallback != null) {
+                ItemStack[] result = kept.isEmpty() ? null : kept.toArray(new ItemStack[0]);
+                onConfirmCallback.accept(result);
+            }
+            handedOver = true;
+        } finally {
+            if (!handedOver) {
+                ItemReturns.giveOrDrop(player, kept.toArray(new ItemStack[0]));
+            }
         }
     }
-    
+
     @Override
     protected void onCancel(InventoryClickEvent event) {
-        confirmed = true;
         returnAllItems();
         if (onCancelCallback != null) {
             onCancelCallback.run();
@@ -138,29 +174,44 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
     }
     
     /**
-     * Collects all items from the content area.
+     * Collects every item placed in the content area, keyed by the slot it sits in, in slot order.
+     * <p>
+     * The slot is part of the result because a caller that gives an item back has to be able to
+     * empty the slot it came from -- see {@link #returnAllItems()} for why that matters.
      */
-    private List<ItemStack> collectItems() {
-        List<ItemStack> items = new ArrayList<>();
+    private Map<Integer, ItemStack> collectPlacedItems() {
+        Map<Integer, ItemStack> items = new LinkedHashMap<>();
         for (int i = 0; i < CONTENT_SIZE; i++) {
             ItemStack item = getInventory().getItem(i);
             if (item != null && !item.getType().isAir()) {
-                items.add(item.clone());
+                items.put(i, item.clone());
             }
         }
         return items;
     }
-    
+
     /**
-     * Returns all items to the player.
+     * Gives every item placed in the content area back to the player, exactly once.
+     * <p>
+     * <b>One-shot by construction, not by a flag.</b> Each slot is emptied before its item is
+     * handed over, so the items this page holds are the state that makes a second return
+     * impossible: a repeated call finds nothing left to give. That matters because more than one
+     * path can legitimately reach this method for the same page -- the Cancel button, a real
+     * {@code InventoryCloseEvent}, the library's own {@code FakeInventoryCloseEvent} when another
+     * page is opened over this one, the owner quitting, and this module being unloaded -- and a
+     * guard that only counted invocations would duplicate items the moment a new path was added.
+     * {@link #onConfirm} drains its slots on the same rule, so this method is safe to call after
+     * a confirm too and no caller needs to ask whether the page was confirmed.
+     * <p>
+     * Whatever the player's inventory has no room for is dropped at their feet rather than
+     * discarded (see {@link ItemReturns#giveOrDrop}).
      */
     public void returnAllItems() {
-        for (int i = 0; i < CONTENT_SIZE; i++) {
-            ItemStack item = getInventory().getItem(i);
-            if (item != null && !item.getType().isAir()) {
-                player.getInventory().addItem(item);
-            }
+        Map<Integer, ItemStack> placed = collectPlacedItems();
+        for (Integer slot : placed.keySet()) {
+            getInventory().setItem(slot, null);
         }
+        ItemReturns.giveOrDrop(player, placed.values().toArray(new ItemStack[0]));
     }
     
     /**
@@ -174,13 +225,6 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
             }
         }
         return false;
-    }
-    
-    /**
-     * Checks if the GUI was confirmed (vs cancelled/closed).
-     */
-    public boolean isConfirmed() {
-        return confirmed;
     }
     
     /**

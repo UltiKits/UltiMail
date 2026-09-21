@@ -8,6 +8,7 @@ import mc.obliviate.inventory.InventoryAPI;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.Item;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link AttachmentSelectorPage}.
@@ -53,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AttachmentSelectorPageTest {
 
     private PlayerMock player;
+    private UltiToolsPlugin plugin;
     private AttachmentSelectorPage page;
     private final AtomicBoolean confirmed = new AtomicBoolean(false);
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -61,7 +64,11 @@ class AttachmentSelectorPageTest {
     @BeforeEach
     void setUp() {
         ServerMock server = MockBukkitHelper.bootstrapServer();
+        // A world is needed because an item that no longer fits in the player's inventory is
+        // dropped at their location rather than destroyed.
+        server.addSimpleWorld("world");
         UltiToolsPlugin mockPlugin = TestHelper.mockUltiToolsPlugin();
+        this.plugin = mockPlugin;
 
         // Register the real obliviate-invs InvListener with the mock plugin manager, exactly
         // as the framework does at startup, so every click in this test travels through the
@@ -251,6 +258,226 @@ class AttachmentSelectorPageTest {
         // must be let through exactly like the plain left-click the placement test above uses.
         assertThat(event.isCancelled())
                 .as("a hotbar-swap placement in the attachment slots must not be cancelled")
+                .isFalse();
+    }
+
+    private int countInPlayerInventory(Material material) {
+        int total = 0;
+        for (ItemStack stack : player.getInventory().getContents()) {
+            if (stack != null && stack.getType() == material) {
+                total += stack.getAmount();
+            }
+        }
+        return total;
+    }
+
+    private int countDroppedInWorld(Material material) {
+        int total = 0;
+        for (Item item : player.getWorld().getEntitiesByClass(Item.class)) {
+            if (item.getItemStack().getType() == material) {
+                total += item.getItemStack().getAmount();
+            }
+        }
+        return total;
+    }
+
+    /** Fills every slot of the player's inventory so nothing more can be added to it. */
+    private void fillPlayerInventory() {
+        player.getInventory().clear();
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            player.getInventory().setItem(slot, new ItemStack(Material.STONE, 64));
+        }
+    }
+
+    @Test
+    @DisplayName("归还已放置的物品必须是一次性的：槽位先清空，再交还")
+    void returningPlacedItemsDrainsTheContentAreaSoItCannotHappenTwice() {
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 1));
+        assertThat(page.getInventory().getItem(0))
+                .as("the item must really be in the page, otherwise this test proves nothing")
+                .isNotNull();
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT)).isZero();
+
+        page.returnAllItems();
+        page.returnAllItems();
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT))
+                .as("the second call has nothing left to give back, because the first one emptied "
+                        + "the slot as it handed the item over")
+                .isEqualTo(1);
+        assertThat(page.getInventory().getItem(0))
+                .as("a returned item must no longer be in the page")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("背包已满时归还的物品应掉落而不是被销毁")
+    void aReturnedItemThatNoLongerFitsIsDroppedRatherThanDestroyed() {
+        fillPlayerInventory();
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 2));
+        assertThat(player.getInventory().firstEmpty())
+                .as("the inventory must really be full for the drop path to be reached")
+                .isEqualTo(-1);
+
+        page.returnAllItems();
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT)).isZero();
+        assertThat(countDroppedInWorld(Material.COPPER_INGOT))
+                .as("an item with nowhere to go must be dropped at the player's feet")
+                .isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("确认时超出上限的物品在背包已满时应掉落而不是被销毁")
+    void excessItemsAboveTheLimitAreDroppedWhenTheInventoryIsFull() {
+        AtomicReference<ItemStack[]> attached = new AtomicReference<>();
+        AttachmentSelectorPage limitedPage = new AttachmentSelectorPage(player, 1, plugin,
+                attached::set, () -> { });
+        limitedPage.open();
+        limitedPage.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 1));
+        limitedPage.getInventory().setItem(1, new ItemStack(Material.IRON_INGOT, 1));
+        fillPlayerInventory();
+        assertThat(player.getInventory().firstEmpty())
+                .as("the inventory must really be full for the drop path to be reached")
+                .isEqualTo(-1);
+
+        // onConfirm is protected; this test lives in the page's own package, which is the access
+        // the real confirm icon has too (its click action calls exactly this method).
+        limitedPage.onConfirm(null);
+
+        assertThat(attached.get())
+                .as("only the first item, up to the limit, may be attached")
+                .hasSize(1);
+        assertThat(countDroppedInWorld(Material.IRON_INGOT))
+                .as("the item above the limit must come back to the player -- dropped when there "
+                        + "is no inventory space, never destroyed")
+                .isEqualTo(1);
+        assertThat(countInPlayerInventory(Material.IRON_INGOT)).isZero();
+    }
+
+    /**
+     * Gate 1 MN-01. {@code onConfirm} used to leave the items it KEPT sitting in their slots and
+     * rely on the {@code confirmed} flag to stop the close handler handing them back a second
+     * time -- so the module's system-level claim that "no path can give the same stack back twice"
+     * because "the content slot is emptied as its item is handed over" was true of
+     * {@link AttachmentSelectorPage#returnAllItems()} and of the excess branch, but not of the
+     * confirm path. Draining every slot it hands over makes the content area the single record of
+     * what the page still owes the player, which is what lets the flag go entirely.
+     */
+    @Test
+    @DisplayName("确认时应清空它交出的每一个槽位，使二次归还无从发生")
+    void confirmDrainsEveryContentSlotItHandsOver() {
+        page.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 5));
+        page.getInventory().setItem(1, new ItemStack(Material.IRON_INGOT, 2));
+        assertThat(page.getInventory().getItem(0))
+                .as("the items must really be in the page, otherwise this test proves nothing")
+                .isNotNull();
+
+        page.onConfirm(null);
+
+        assertThat(receivedItems.get())
+                .as("both placed stacks are inside the limit, so both must be handed onward")
+                .hasSize(2);
+        for (int slot = 0; slot < AttachmentSelectorPage.getContentSize(); slot++) {
+            assertThat(page.getInventory().getItem(slot))
+                    .as("slot %d must have been emptied as its item was handed over", slot)
+                    .isNull();
+        }
+
+        // The invariant the drained slots buy: the close, quit and unload paths all funnel into
+        // returnAllItems(), and after a confirm it must find nothing left to give.
+        page.returnAllItems();
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT) + countDroppedInWorld(Material.COPPER_INGOT))
+                .as("a confirmed selection belongs to the mail; returning it as well would duplicate it")
+                .isZero();
+        assertThat(countInPlayerInventory(Material.IRON_INGOT) + countDroppedInWorld(Material.IRON_INGOT))
+                .isZero();
+    }
+
+    /**
+     * Gate 1 MN-02. Draining the slots before the callback runs is what makes a second return
+     * impossible -- and it is also what would turn a throwing callback into item destruction,
+     * since the items are then in neither the page nor the mail. The confirm path therefore hands
+     * the kept items back if the callback did not complete. Without that compensation this test's
+     * items would exist nowhere at all.
+     */
+    @Test
+    @DisplayName("确认回调抛异常时应把已保留的物品归还，而不是让它们消失")
+    void aConfirmCallbackThatThrowsStillGivesTheKeptItemsBack() {
+        AttachmentSelectorPage throwingPage = new AttachmentSelectorPage(player, 27, plugin,
+                items -> {
+                    throw new IllegalStateException("the confirm callback blew up");
+                },
+                () -> { });
+        throwingPage.open();
+        throwingPage.getInventory().setItem(0, new ItemStack(Material.COPPER_INGOT, 4));
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT))
+                .as("the player must not already hold the item under test")
+                .isZero();
+
+        assertThatThrownBy(() -> throwingPage.onConfirm(null))
+                .as("a failing confirm callback is surfaced, not swallowed")
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(countInPlayerInventory(Material.COPPER_INGOT) + countDroppedInWorld(Material.COPPER_INGOT))
+                .as("the callback never took custody, so the items must be back with the player "
+                        + "rather than lost between the drained page and the mail that was never sent")
+                .isEqualTo(4);
+        assertThat(throwingPage.getInventory().getItem(0))
+                .as("and they must not ALSO still be in the page, which would duplicate them")
+                .isNull();
+    }
+
+    /**
+     * Gate 1 MJ-01. The checklist row for this page asserted that "a shift-click INTO the content
+     * area while it has room is deliberately allowed, not guarded". Measured here: it is cancelled,
+     * and not by anything this module wrote. A shift-click originating in the player's own inventory
+     * has its raw slot in the BOTTOM inventory, so {@link AttachmentSelectorPage#onClick} reports
+     * unhandled ({@code rawSlot >= 0 && rawSlot < CONTENT_SIZE} is false), and the library's
+     * {@code InvListener#onClick} then takes its {@code getSlot() != getRawSlot()} branch and
+     * cancels {@code MOVE_TO_OTHER_INVENTORY} outright.
+     * <p>
+     * The free content slot asserted first is the positive control: "while it has room" really did
+     * hold, and the click was cancelled anyway -- so this is not a full-page artefact.
+     */
+    @Test
+    @DisplayName("从玩家背包 shift-click 放入内容区域会被取消（MJ-01：与文档此前的说法相反）")
+    void shiftClickPlacementFromThePlayerInventoryIsCancelled() {
+        InventoryView view = player.getOpenInventory();
+        assertThat(view.getTopInventory().firstEmpty())
+                .as("a content slot must really be free, so 'while it has room' holds and this test "
+                        + "is not measuring a full page")
+                .isBetween(0, AttachmentSelectorPage.getContentSize() - 1);
+
+        InventoryClickEvent event = new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER,
+                view.getTopInventory().getSize() + 4, ClickType.SHIFT_LEFT,
+                InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled())
+                .as("the GUI library cancels MOVE_TO_OTHER_INVENTORY for any bottom-inventory slot "
+                        + "this page does not handle, so shift-click placement does not work -- the "
+                        + "only way to place an attachment is a plain pick-up-and-place click")
+                .isTrue();
+    }
+
+    /**
+     * The other half of MJ-01's note: removal by shift-click DOES work, because the raw slot is
+     * then inside the content area and this page reports the click handled. Kept next to the test
+     * above so the asymmetry the documents now state is visible in one place.
+     */
+    @Test
+    @DisplayName("从内容区域 shift-click 取出物品不会被取消")
+    void shiftClickRemovalOutOfTheContentAreaIsNotCancelled() {
+        page.getInventory().setItem(7, new ItemStack(Material.DIAMOND));
+
+        InventoryClickEvent event = topInventoryClickEvent(7, ClickType.SHIFT_LEFT,
+                InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled())
+                .as("the raw slot is inside the content area, so this page reports the click handled "
+                        + "and the library leaves it alone")
                 .isFalse();
     }
 
