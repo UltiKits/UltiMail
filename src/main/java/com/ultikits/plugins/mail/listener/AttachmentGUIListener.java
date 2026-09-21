@@ -131,9 +131,7 @@ public class AttachmentGUIListener implements Listener {
             return;
         }
         openPages.remove(closedBy.getUniqueId());
-        if (!page.isConfirmed()) {
-            page.returnAllItems();
-        }
+        page.returnAllItems();
     }
 
     /**
@@ -144,7 +142,7 @@ public class AttachmentGUIListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
         AttachmentSelectorPage page = openPages.remove(event.getPlayer().getUniqueId());
-        if (page != null && !page.isConfirmed()) {
+        if (page != null) {
             page.returnAllItems();
         }
     }
