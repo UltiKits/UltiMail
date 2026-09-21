@@ -24,14 +24,4 @@ public class UltiMail extends UltiToolsPlugin {
         getLogger().info(i18n("UltiMail 已启用！"));
         return true;
     }
-
-    @Override
-    public void unregisterSelf() {
-        getLogger().info(i18n("UltiMail 已禁用！"));
-    }
-
-    @Override
-    public void reloadSelf() {
-        getLogger().info(i18n("UltiMail 配置已重载！"));
-    }
 }
