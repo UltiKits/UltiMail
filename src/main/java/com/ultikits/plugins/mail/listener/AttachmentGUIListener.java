@@ -43,13 +43,16 @@ import java.util.logging.Logger;
  * event, and that tracking is the only identification used here. The open event learns which page
  * it belongs to from the GUI library's own registry ({@code InventoryAPI#getPlayersCurrentGui},
  * populated by {@code Gui#open()} before the inventory is shown, which is also what the library's
- * own {@code InvListener} consults). That registry deliberately is NOT consulted at close time:
- * the library removes the player's entry inside its own close handler, and on the Paper 1.21 API
- * this module targets that handler raises {@link IncompatibleClassChangeError} before it gets
- * there ({@code Gui#onClose} still calls {@code InventoryView.getTopInventory()} with
- * {@code invokevirtual}, while {@code InventoryView} is now an interface), so at close time the
- * registry is either already emptied or inconsistent. Module-side tracking is what makes the
- * return reliable either way.
+ * own {@code InvListener} consults). That registry deliberately is NOT consulted at close time,
+ * and the reason is the opposite of "by then it has been cleaned up": the library never removes the
+ * entry, because its own close handler raises {@link IncompatibleClassChangeError} before reaching
+ * the removal, so the registry outlives the page it names. Measured on the shaded framework jar:
+ * {@code InvListener#onClose} calls {@code Gui#onClose} at offset 67 and
+ * {@code getPlayers().remove(uuid)} only at offset 88, and {@code Gui#onClose} reaches
+ * {@code InventoryView.getTopInventory()} with {@code invokevirtual} at its own offset 20 -- while
+ * on the Paper 1.21 API this module targets {@code InventoryView} is an interface. A stale registry
+ * that keeps answering with a page that has already closed is worse to rely on than nothing, which
+ * is why the return is driven by this class's own tracking instead.
  *
  * @author wisdomme
  * @version 2.0.0
