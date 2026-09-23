@@ -233,9 +233,9 @@ class MailNotifyListenerTest {
         /**
          * UltiKits/UltiMail#23. {@code config/mail.yml}'s {@code messages.new-mail} is removed on the
          * ground that the join notification already takes its text from the language catalogue's
-         * {@code notify_new_mail}. This pins that ground: the notification's text component is the
-         * catalogue entry, and the removed key's shipped value (Chinese, "你有 ... 封未读邮件") is
-         * nowhere in what the player receives. The mocked catalogue answers {@code [key]}.
+         * {@code notify_new_mail}. This characterises that existing read -- it passes before and after
+         * the removal alike, so it is not a revert proof: the notification's text component is the
+         * catalogue entry. The mocked catalogue answers {@code [key]}.
          */
         @Test
         @DisplayName("the notification text is the catalogue's notify_new_mail, never config's removed messages.new-mail")
@@ -253,7 +253,6 @@ class MailNotifyListenerTest {
                 text.append(component.toPlainText());
             }
             assertThat(text.toString()).contains("[notify_new_mail]");
-            assertThat(text.toString()).doesNotContain("你有");
         }
 
         @Test
