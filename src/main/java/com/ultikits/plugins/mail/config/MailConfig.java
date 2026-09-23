@@ -24,10 +24,6 @@ public class MailConfig extends AbstractConfigEntity {
     @Range(min = 1, max = 54)
     private int maxItems = 27;
 
-    @ConfigEntry(path = "mail-expire-days", comment = "邮件过期天数（0为永不过期）")
-    @Range(min = 0, max = 365)
-    private int mailExpireDays = 30;
-
     @ConfigEntry(path = "notify-on-join", comment = "玩家登录时通知未读邮件")
     private boolean notifyOnJoin = true;
 
@@ -47,14 +43,6 @@ public class MailConfig extends AbstractConfigEntity {
     @Range(min = 0, max = 300)
     private int sendCooldown = 10;
     
-    @ConfigEntry(path = "messages.new-mail", comment = "新邮件通知")
-    @NotEmpty
-    private String newMailMessage = "&e[邮件] &f你有 &a{COUNT} &f封未读邮件！使用 /mail inbox 查看";
-
-    @ConfigEntry(path = "messages.mail-sent", comment = "邮件发送成功")
-    @NotEmpty
-    private String mailSentMessage = "&a邮件已发送给 {PLAYER}！";
-
     @ConfigEntry(path = "messages.mail-received", comment = "收到新邮件")
     @NotEmpty
     private String mailReceivedMessage = "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！";
