@@ -17,8 +17,15 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@ConfigEntity("config/mail.yml")
+@ConfigEntity(MailConfig.CONFIG_FILE)
 public class MailConfig extends AbstractConfigEntity {
+
+    /**
+     * This entity's file, relative to the module's folder. The one place the path is written: the
+     * annotation above, the constructor and the removed-key check in {@code UltiMail} all read it
+     * from here, so they cannot drift apart (UltiKits/UltiMail#23).
+     */
+    public static final String CONFIG_FILE = "config/mail.yml";
     
     @ConfigEntry(path = "max-items", comment = "每封邮件最多附带物品数量")
     @Range(min = 1, max = 54)
@@ -99,6 +106,6 @@ public class MailConfig extends AbstractConfigEntity {
     private String recallEmailContent = "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
     
     public MailConfig() {
-        super("config/mail.yml");
+        super(CONFIG_FILE);
     }
 }
