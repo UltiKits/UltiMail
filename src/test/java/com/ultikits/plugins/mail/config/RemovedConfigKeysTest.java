@@ -122,6 +122,10 @@ class RemovedConfigKeysTest {
      * into the catalogue as told would have it refused by the framework's placeholder check and
      * replaced with the bundled text, so each message warning names the placeholder to use and the
      * one it replaces.
+     * <p>
+     * Codex P2 on #35: the join notification does not yet substitute {@code {0}} (it replaces
+     * {@code {COUNT}}, UltiKits/UltiMail#24), so the new-mail warning must not claim that {@code {0}}
+     * renders the unread count; it names #24 instead. {@code {RECEIVER}} is substituted today.
      */
     @Test
     @DisplayName("the two message warnings name the catalogue placeholder, and the old one it replaces")
@@ -130,7 +134,9 @@ class RemovedConfigKeysTest {
 
         List<String> warnings = warningsFor(file);
 
-        assertThat(warnings.get(1)).contains("{0}").contains("{COUNT}");
+        assertThat(warnings.get(1)).contains("{0}").contains("{COUNT}")
+                .contains("UltiKits/UltiMail#24")
+                .doesNotContain("{0} for the unread count");
         assertThat(warnings.get(2)).contains("{RECEIVER}").contains("{PLAYER}");
         // Control: the expiry warning is about no placeholder at all.
         assertThat(warnings.get(0)).doesNotContain("{0}", "{RECEIVER}");
