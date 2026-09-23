@@ -116,6 +116,26 @@ class RemovedConfigKeysTest {
         assertThat(warnings.get(2)).contains("lang/");
     }
 
+    /**
+     * Gate 1 IN-02. The removed keys used {@code {COUNT}} and {@code {PLAYER}}; the catalogue entries
+     * they point to use {@code {0}} and {@code {RECEIVER}}. An operator who pastes their old text
+     * into the catalogue as told would have it refused by the framework's placeholder check and
+     * replaced with the bundled text, so each message warning names the placeholder to use and the
+     * one it replaces.
+     */
+    @Test
+    @DisplayName("the two message warnings name the catalogue placeholder, and the old one it replaces")
+    void messageWarningsNameThePlaceholderChange(@TempDir File dir) throws IOException {
+        File file = write(dir, FILE_WITH_THE_REMOVED_KEYS);
+
+        List<String> warnings = warningsFor(file);
+
+        assertThat(warnings.get(1)).contains("{0}").contains("{COUNT}");
+        assertThat(warnings.get(2)).contains("{RECEIVER}").contains("{PLAYER}");
+        // Control: the expiry warning is about no placeholder at all.
+        assertThat(warnings.get(0)).doesNotContain("{0}", "{RECEIVER}");
+    }
+
     @Test
     @DisplayName("an empty leftover value is still a leftover key")
     void warnsAboutAnEmptyLeftoverValue(@TempDir File dir) throws IOException {
