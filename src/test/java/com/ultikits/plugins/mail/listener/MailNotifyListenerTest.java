@@ -230,6 +230,32 @@ class MailNotifyListenerTest {
     @DisplayName("可点击通知消息测试")
     class ClickableNotificationTests {
 
+        /**
+         * UltiKits/UltiMail#23. {@code config/mail.yml}'s {@code messages.new-mail} is removed on the
+         * ground that the join notification already takes its text from the language catalogue's
+         * {@code notify_new_mail}. This pins that ground: the notification's text component is the
+         * catalogue entry, and the removed key's shipped value (Chinese, "你有 ... 封未读邮件") is
+         * nowhere in what the player receives. The mocked catalogue answers {@code [key]}.
+         */
+        @Test
+        @DisplayName("the notification text is the catalogue's notify_new_mail, never config's removed messages.new-mail")
+        void takesItsTextFromTheCatalogue() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(3);
+
+            listener.onPlayerJoin(new PlayerJoinEvent(player, "joined"));
+
+            ArgumentCaptor<net.md_5.bungee.api.chat.BaseComponent[]> sent =
+                    ArgumentCaptor.forClass(net.md_5.bungee.api.chat.BaseComponent[].class);
+            verify(mockSpigot).sendMessage(sent.capture());
+            StringBuilder text = new StringBuilder();
+            for (net.md_5.bungee.api.chat.BaseComponent component : sent.getValue()) {
+                text.append(component.toPlainText());
+            }
+            assertThat(text.toString()).contains("[notify_new_mail]");
+            assertThat(text.toString()).doesNotContain("你有");
+        }
+
         @Test
         @DisplayName("通知消息应包含未读数量")
         void shouldIncludeUnreadCount() {

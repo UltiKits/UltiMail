@@ -82,7 +82,6 @@ public final class TestHelper {
         when(config.getSendCooldown()).thenReturn(10);
         when(config.isNotifyOnJoin()).thenReturn(true);
         when(config.getNotifyDelay()).thenReturn(3);
-        when(config.getNewMailMessage()).thenReturn("&e[邮件] &f你有 &a{COUNT} &f封未读邮件！");
         when(config.getMailReceivedMessage()).thenReturn("&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！");
         return config;
     }
