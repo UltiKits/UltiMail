@@ -42,14 +42,16 @@ public final class RemovedConfigKeys {
                 "Its value was never shown to players. The unread-mail notification on join takes "
                         + "its text from the 'notify_new_mail' entry of this module's language file "
                         + "(lang/<language>.yml, in the same module folder as config/mail.yml), so "
-                        + "it follows the server's language setting; edit it there "
+                        + "it follows the server's language setting; edit it there, using {0} for "
+                        + "the unread count where the old key used {COUNT} "
                         + "(UltiKits/UltiMail#23).");
         removed.put("messages.mail-sent",
                 "Its value was never shown to players. The confirmation a sender gets after "
                         + "sending a mail takes its text from the 'mail_sent_success' entry of this "
                         + "module's language file (lang/<language>.yml, in the same module folder "
                         + "as config/mail.yml), so it follows the server's language setting; edit "
-                        + "it there (UltiKits/UltiMail#23).");
+                        + "it there, using {RECEIVER} for the receiver's name where the old key "
+                        + "used {PLAYER} (UltiKits/UltiMail#23).");
         REMOVED = Collections.unmodifiableMap(removed);
     }
 
