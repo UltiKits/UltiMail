@@ -42,9 +42,10 @@ public final class RemovedConfigKeys {
                 "Its value was never shown to players. The unread-mail notification on join takes "
                         + "its text from the 'notify_new_mail' entry of this module's language file "
                         + "(lang/<language>.yml, in the same module folder as config/mail.yml), so "
-                        + "it follows the server's language setting; edit it there, using {0} for "
-                        + "the unread count where the old key used {COUNT} "
-                        + "(UltiKits/UltiMail#23).");
+                        + "it follows the server's language setting; edit it there, keeping that "
+                        + "entry's {0} placeholder where the old key used {COUNT} (an edit that "
+                        + "drops {0} is refused). The notification does not yet put the unread "
+                        + "count into {0}; that is UltiKits/UltiMail#24 (UltiKits/UltiMail#23).");
         removed.put("messages.mail-sent",
                 "Its value was never shown to players. The confirmation a sender gets after "
                         + "sending a mail takes its text from the 'mail_sent_success' entry of this "

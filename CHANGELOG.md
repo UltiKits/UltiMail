@@ -96,9 +96,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from this module's language file, entries `notify_new_mail` and `mail_sent_success` in
   `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting
   and are customised there. Their placeholders differ from the removed keys': `notify_new_mail`
-  takes the unread count as `{0}` (not `{COUNT}`), and `mail_sent_success` takes the receiver's
+  carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
   name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
-  the framework, which then uses the bundled text. What players see is unchanged. `messages.mail-received`, the setting
+  the framework, which then uses the bundled text. The join notification does not yet put the
+  unread count into `{0}` (UltiKits/UltiMail#24). What players see is unchanged. `messages.mail-received`, the setting
   for the message an online receiver gets when a mail arrives, is read and stays. A server upgraded
   from an earlier version keeps both removed keys in its `mail.yml`; while either is there, the
   module logs one warning for it at startup and on every reload of this module, naming the file,
@@ -117,8 +118,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   读取它们，修改它们从未改变玩家看到的内容。玩家登录时的未读邮件提醒，以及发送者发出邮件后收到的确认消息，
   本来就从本模块的语言文件读取文本——`config` 文件夹旁 `lang/<语言>.yml` 中的 `notify_new_mail` 与
   `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置，也应在那里修改。这两个条目的占位符与被移除的
-  键不同：`notify_new_mail` 以 `{0}`（而非 `{COUNT}`）表示未读数量，`mail_sent_success` 以 `{RECEIVER}`
-  （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。玩家看到的内容不变。
+  键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
+  （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
+  填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
   同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
   服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
   为它记录一条警告，指出文件、键名以及应改为修改的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
