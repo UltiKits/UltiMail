@@ -22,10 +22,10 @@ for UAT execution and issue reconciliation — the public description of these f
   This module has no `scheduled` rows (`@Scheduled` count is 0, confirmed below), no `gate` rows
   (`@ConditionalOnConfig` count is 0), and no `placeholder` rows (this module registers no
   PlaceholderAPI expansion and consumes none) — all three Kinds stay in the vocabulary for
-  cross-repository consistency even though none appears below. The one row under `## Lifecycle Hooks` is an
-  `event` row with no `@EventHandler` site behind it: `/ul reload` is a framework-invoked
-  lifecycle step, not a command this repository maps or a config read, so `event` is the
-  closest-fitting Kind.
+  cross-repository consistency even though none appears below. The three rows under `## Lifecycle Hooks` are
+  `event` rows with no `@EventHandler` site behind them: module load, `/ul reload` and
+  `/upm uninstall` are framework-invoked lifecycle steps, not commands this repository maps or
+  config reads, so `event` is the closest-fitting Kind.
 - **Tier**, exactly three: `player`, `admin`, `internal`. Judged from what the feature is for, not
   from whether it carries a permission string — this module's three `@CmdExecutor` classes each
   declare exactly one class-level permission node (`ultimail.use`, `ultimail.send`,
@@ -43,7 +43,7 @@ for UAT execution and issue reconciliation — the public description of these f
   `requireOp = true`, so no row below carries the suffix. `n/a` is for every Kind that is not
   `command`.
 - **Source:** `ClassName#member` — the class and member that actually reads or applies the
-  feature — for every Kind, `config` included: all 23 `config` rows below cite the reading
+  feature — for every Kind, `config` included: all 20 `config` rows below cite the reading
   member. This module's one configuration file (`mail.yml`) is a real
   `@ConfigEntity`/`@ConfigEntry`-bound class, so a config row's Source cites whichever class and
   method actually calls the generated getter — not the config class's own field declaration,
@@ -87,9 +87,9 @@ rather than an error:
    same command is trustworthy unmodified against every repository in the fan-out.
 
 **Positive control:** the line-start form returns `@CmdExecutor` = 3, `@CmdMapping` = 17,
-`@EventListener` = 2 (classes), `@EventHandler` = 4 (handler methods), `@Scheduled` = 0,
-`@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 23, `@Table` = 1
-(`MailData`) — confirmed by reading all 13 source files directly, not by trusting the count
+`@EventListener` = 2 (classes), `@EventHandler` = 6 (handler methods), `@Scheduled` = 0,
+`@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 20, `@Table` = 1
+(`MailData`) — confirmed by reading all 15 source files directly, not by trusting the count
 alone. `MailCommand`'s twelve `@CmdMapping` sites are this module's standing positive control —
 the class with the most sub-commands behind one executor, the shape most likely to silently drop
 a row under a naive approach, confirmed present one by one against `MailCommand.java`'s own
@@ -98,8 +98,9 @@ source (`read` line 58, `sentgui` line 66, `inbox` line 73, `sent` line 102, `re
 `sendall <content>` line 246, `sendall <content> items` line 254, bare `""` line 274). This
 document's command-row count (18) diverges from the `@CmdMapping` count (17) for one explained
 reason, stated in the `## Recall` section below. This section carries 0 rows against the
-reconciliation table's `@Scheduled` = 0 (this module runs no scheduled task at all — mail expiry,
-despite `mail-expire-days` implying one exists, does not; see `## Configuration`).
+reconciliation table's `@Scheduled` = 0 (this module runs no scheduled task at all, and has no
+mail expiry: the `mail-expire-days` key that implied one was removed by `UltiKits/UltiMail#23`,
+and mail expiry is a feature request, `UltiKits/UltiMail#34`).
 
 ## Mail
 
@@ -185,20 +186,23 @@ Phase 9 excluded all three classes below from this module's JaCoCo `check` gate
 As of UltiTools 6.3.0 `UltiToolsPlugin#unregisterSelf()` and `UltiToolsPlugin#reloadSelf()` are
 `final` framework template methods. Before `UltiKits/UltiMail#20` this module overrode both
 directly, completely replacing the framework's own steps, and each override only logged a line;
-both were deleted rather than renamed. This module has no `onReload()` hook. It does have an
-`onUnregister()` hook, added for `UltiKits/UltiMail#27`: the framework calls that hook *before*
-unregistering the module's listeners, which is the only point where both the attachment-selector
-tracking and the online player still exist — see `ultimail.lifecycle.unload`.
-`/ul reload UltiMail` (and `/ul reload`, which reloads every module) now runs
-only the framework's own reload steps: config reload, language refresh, `@ConditionalOnConfig`
-drift report, and the framework's per-module `Module 'UltiMail' reloaded.` INFO line.
+both were deleted rather than renamed. This module has an `onUnregister()` hook, added for
+`UltiKits/UltiMail#27`: the framework calls that hook *before* unregistering the module's
+listeners, which is the only point where both the attachment-selector tracking and the online
+player still exist — see `ultimail.lifecycle.unload`. It also has an `onReload()` hook, added for
+`UltiKits/UltiMail#23`, whose only work is the removed-key warning — see
+`ultimail.lifecycle.removed-key-warning`. `/ul reload UltiMail` (and `/ul reload`, which reloads
+every module) runs the framework's own reload steps — config reload, language refresh,
+`@ConditionalOnConfig` drift report, and the framework's per-module `Module 'UltiMail' reloaded.`
+INFO line — and then that hook.
 `ultimail.lifecycle.reload` records what that changes for an operator: `ConfigManager#reloadConfigs`
 re-initialises, in place, the same `MailConfig` instance the container injected into `MailService`,
 `MailNotifyListener` and `RecallCommand`, and each of them calls its getters at call time.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultimail.lifecycle.reload | `/ul reload UltiMail` re-reads `config/mail.yml` into the running module, so an edited value such as `max-subject-length` applies to the next mail submitted without a restart; this module adds no reload work of its own (it has no `onReload()` hook) and prints no reload line of its own. Before `UltiKits/UltiMail#20` the module's reload override replaced the framework's reload and only logged, so an edit took effect only after a restart | event | `/ul reload UltiMail` (framework calls `reloadSelf()`, which reloads configuration, refreshes language, reports `@ConditionalOnConfig` drift and logs its own per-module line) | n/a | n/a | admin | brief | MailService#sendMail |
+| ultimail.lifecycle.reload | `/ul reload UltiMail` re-reads `config/mail.yml` into the running module, so an edited value such as `max-subject-length` applies to the next mail submitted without a restart; this module's own reload work is only the removed-key warning (`ultimail.lifecycle.removed-key-warning`), and it prints no reload line of its own. Before `UltiKits/UltiMail#20` the module's reload override replaced the framework's reload and only logged, so an edit took effect only after a restart | event | `/ul reload UltiMail` (framework calls `reloadSelf()`, which reloads configuration, refreshes language, reports `@ConditionalOnConfig` drift and logs its own per-module line) | n/a | n/a | admin | brief | MailService#sendMail |
+| ultimail.lifecycle.removed-key-warning | When this module loads, and on every reload of it, it checks its operator's own `config/mail.yml` for the three keys `UltiKits/UltiMail#23` removed (`mail-expire-days`, `messages.new-mail`, `messages.mail-sent`), which the framework never deletes from an existing file, and logs one WARNING per key still present, naming the file and the key and saying where the setting went: mail expiry is a feature request (`UltiKits/UltiMail#34`), and each message's text is edited in this module's language file (`notify_new_mail`, `mail_sent_success`), whose placeholders are `{0}` and `{RECEIVER}` where the removed keys used `{COUNT}` and `{PLAYER}` (the join notification does not yet put the count into `{0}`, `UltiKits/UltiMail#24`). A file without those keys produces no line; a missing or unparseable file produces none either; a failure inside the check is logged and never fails the load or the reload | event | server start (the framework calls `registerSelf()` when it loads this module), and `/ul reload UltiMail` or `/ul reload` (framework calls `reloadSelf()`, which calls this module's `onReload()` last) | n/a | n/a | admin | brief | UltiMail#registerSelf, UltiMail#onReload, RemovedConfigKeys#warnAboutLeftovers |
 | ultimail.lifecycle.unload | Unloading this module hands back every item still sitting in an open `AttachmentSelectorPage` and closes that page, before the module stops listening. This is the module's only unload work: the framework's own command and listener unregistration runs around it, and `unregisterSelf()` is not overridden (it is `final`). It exists because the other two returns both need an event that unloading removes the listener for — the items an open selector holds live only in an in-memory inventory container that nothing persists, so without this they were destroyed (`UltiKits/UltiMail#27`) | event | `/upm uninstall UltiMail` (framework calls `unregisterSelf()`, which calls this module's `onUnregister()` first) | n/a | n/a | admin | detailed | UltiMail#onUnregister, AttachmentGUIListener#returnEveryOpenSelector |
 
 ## Data persistence
@@ -209,16 +213,18 @@ re-initialises, in place, the same `MailConfig` instance the container injected 
 
 ## Configuration
 
-Every `@ConfigEntry`-annotated field on this module's one `@ConfigEntity` class (23 keys total,
+Every `@ConfigEntry`-annotated field on this module's one `@ConfigEntity` class (20 keys total,
 matching the reconciliation table's own `@ConfigEntry` count exactly). Several of these keys
 already have a behavioural row above (broadcast, recall, notification) — that row documents the
 *feature* the key drives, this row documents the *key* itself, at key granularity, so the
 reconciliation table can prove every key is accounted for without also making every behavioural
 row carry a `config` Kind.
 
-**Three keys are declared and validated but never read by any production code — see
-UltiKits/UltiMail#23, each called out in its own row below rather than a claim that editing it
-changes anything.**
+**Three keys that were declared and validated but never read by any production code —
+`mail-expire-days`, `messages.new-mail` and `messages.mail-sent` — were removed by
+UltiKits/UltiMail#23 and have no row here.** `mail-expire-days` described an expiry that does not
+exist (feature request `UltiKits/UltiMail#34`); the two message keys duplicated text the language
+catalogue already supplies (`notify_new_mail`, `mail_sent_success`).
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
@@ -232,13 +238,10 @@ changes anything.**
 | ultimail.config.mail.email.smtp-ssl | Use SSL for the recall email path's SMTP connection | config | `config/mail.yml: email.smtp-ssl (default: false)` | n/a | n/a | admin | none | RecallCommand#sendRealEmail |
 | ultimail.config.mail.email.smtp-starttls | Use STARTTLS for the recall email path's SMTP connection (checked only when `email.smtp-ssl` is false) | config | `config/mail.yml: email.smtp-starttls (default: true)` | n/a | n/a | admin | none | RecallCommand#sendRealEmail |
 | ultimail.config.mail.email.smtp-username | SMTP authentication username for the recall email path | config | `config/mail.yml: email.smtp-username (default: "")` | n/a | n/a | admin | brief | RecallCommand#sendRealEmail |
-| ultimail.config.mail.mail-expire-days | Declared as mail expiry in days (0 = never); never read anywhere in this module's source, and no scheduled task or read-time check enforces expiry at all — a mail never expires regardless of this key's value. Known product defect, UltiKits/UltiMail#23 | config | `config/mail.yml: mail-expire-days (default: 30, has no effect, see UltiKits/UltiMail#23)` | n/a | n/a | admin | brief | MailConfig#mailExpireDays (declared, never read outside this class) |
 | ultimail.config.mail.max-content-length | Maximum mail content length, in characters | config | `config/mail.yml: max-content-length (default: 500)` | n/a | n/a | admin | brief | MailService#sendMail |
 | ultimail.config.mail.max-items | Maximum item attachments per mail | config | `config/mail.yml: max-items (default: 27)` | n/a | n/a | admin | brief | MailService#createMailData |
 | ultimail.config.mail.max-subject-length | Maximum mail subject length, in characters | config | `config/mail.yml: max-subject-length (default: 50)` | n/a | n/a | admin | brief | MailService#sendMail |
-| ultimail.config.mail.messages.mail-received | Chat message shown to an ONLINE receiver the instant a mail arrives; `{SENDER}` substituted. The only one of this file's four `messages.*` keys genuinely read by production code | config | `config/mail.yml: messages.mail-received (default: Simplified Chinese text, not reproduced per D-02 -- see this same file's source line for the exact characters)` | n/a | n/a | admin | brief | MailService#notifyReceiver |
-| ultimail.config.mail.messages.mail-sent | Declared as the send-confirmation message; never read — the real confirmation text is `lang/en.yml`'s `mail_sent_success` key instead (`SendMailCommand.ContentPrompt#acceptInput`). Known product defect, UltiKits/UltiMail#23 | config | `config/mail.yml: messages.mail-sent (default: Simplified Chinese text, not reproduced per D-02, has no effect, see UltiKits/UltiMail#23)` | n/a | n/a | admin | brief | MailConfig#mailSentMessage (declared, never read outside this class) |
-| ultimail.config.mail.messages.new-mail | Declared as the join-notification message; never read — the real join-notification text is `lang/en.yml`'s `notify_new_mail` key instead (`MailNotifyListener#sendClickableNotification`). Known product defect, UltiKits/UltiMail#23 | config | `config/mail.yml: messages.new-mail (default: Simplified Chinese text, not reproduced per D-02, has no effect, see UltiKits/UltiMail#23)` | n/a | n/a | admin | brief | MailConfig#newMailMessage (declared, never read outside this class) |
+| ultimail.config.mail.messages.mail-received | Chat message shown to an ONLINE receiver the instant a mail arrives; `{SENDER}` substituted. This file's only `messages.*` key: its two former siblings, `messages.new-mail` and `messages.mail-sent`, were never read and were removed by UltiKits/UltiMail#23 | config | `config/mail.yml: messages.mail-received (default: Simplified Chinese text, not reproduced per D-02 -- see this same file's source line for the exact characters)` | n/a | n/a | admin | brief | MailService#notifyReceiver |
 | ultimail.config.mail.notify-delay | Delay, in seconds, before the join notification fires, letting other join-time plugins finish first | config | `config/mail.yml: notify-delay (default: 3)` | n/a | n/a | admin | none | MailNotifyListener#onPlayerJoin |
 | ultimail.config.mail.notify-on-join | Whether an unread-mail notification is sent on join at all | config | `config/mail.yml: notify-on-join (default: true)` | n/a | n/a | admin | brief | MailNotifyListener#onPlayerJoin |
 | ultimail.config.mail.recall.content | In-game recall mail body template; `{SERVER}`/`{SENDER}` placeholders (overridden entirely if `/recall <message>`'s custom message argument is supplied) | config | `config/mail.yml: recall.content (default: Simplified Chinese text, not reproduced per D-02 -- see this same file's source line for the exact characters)` | n/a | n/a | admin | brief | RecallCommand#sendGameMail |

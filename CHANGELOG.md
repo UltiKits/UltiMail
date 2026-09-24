@@ -80,6 +80,47 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   setting), and the never-consulted `mail_disabled` and `mail_reloaded` language keys that
   described them. UltiTools 6.3.0 logs one reload line per module (`Module 'UltiMail' reloaded.`)
   (UltiKits/UltiMail#20).
+- The `mail-expire-days` setting in `config/mail.yml` (default `30`). It never took effect in any
+  version: nothing read it, this module has no mail expiry of any kind, and a mail was always kept
+  until a player deleted it, whatever the value. Mail behaviour is unchanged. Removing the setting
+  is not a rejection of mail expiry: a real implementation, which among other things has to decide
+  what happens to a mail whose attachment was never claimed, is tracked as a feature request in
+  UltiKits/UltiMail#34. A server upgraded from an earlier version keeps the key in its `mail.yml`,
+  because the framework never deletes a key from an operator's file; while it is there, the module
+  logs one warning at startup and on every reload of this module (`/ul reload` or
+  `/ul reload UltiMail`), naming the file and the key, and the key can simply be deleted
+  (UltiKits/UltiMail#23).
+- The `messages.new-mail` and `messages.mail-sent` settings in `config/mail.yml`. Neither ever took
+  effect: nothing read them, so editing them never changed what a player saw. The unread-mail
+  notification on join and the confirmation a sender gets after sending already take their text
+  from this module's language file, entries `notify_new_mail` and `mail_sent_success` in
+  `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting
+  and are customised there. Their placeholders differ from the removed keys': `notify_new_mail`
+  carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
+  name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
+  the framework, which then uses the bundled text. The join notification does not yet put the
+  unread count into `{0}` (UltiKits/UltiMail#24). What players see is unchanged. `messages.mail-received`, the setting
+  for the message an online receiver gets when a mail arrives, is read and stays. A server upgraded
+  from an earlier version keeps both removed keys in its `mail.yml`; while either is there, the
+  module logs one warning for it at startup and on every reload of this module, naming the file,
+  the key and the language entry to edit instead, and the key can simply be deleted
+  (UltiKits/UltiMail#23).
 - 移除本模块在卸载与重载时输出的"UltiMail 已禁用！"与"UltiMail 配置已重载！"控制台行，以及未被使用的
   `mail_disabled`、`mail_reloaded` 语言键。UltiTools 6.3.0 会为每个模块输出一行重载日志
   （UltiKits/UltiMail#20）。
+- 移除 `config/mail.yml` 中的 `mail-expire-days` 设置项（默认 `30`）。它在任何版本中都从未生效：没有任何代码
+  读取它，本模块也没有任何形式的邮件过期，无论取值为何，邮件都会一直保留到玩家自行删除为止。邮件的行为不变。
+  移除该设置项并不代表否决邮件过期功能：真正的实现需要决定的事情之一，是附件从未领取的邮件过期后如何处理，
+  该功能请求由 UltiKits/UltiMail#34 跟踪。从旧版本升级的服务器，其 `mail.yml` 中仍会保留该键，因为框架从不删除
+  运维文件中的键；只要该键还在，本模块会在启动时以及每次重载本模块时（`/ul reload` 或
+  `/ul reload UltiMail`）记录一条警告，指出文件与键名，直接删除该键即可（UltiKits/UltiMail#23）。
+- 移除 `config/mail.yml` 中的 `messages.new-mail` 与 `messages.mail-sent` 设置项。二者都从未生效：没有任何代码
+  读取它们，修改它们从未改变玩家看到的内容。玩家登录时的未读邮件提醒，以及发送者发出邮件后收到的确认消息，
+  本来就从本模块的语言文件读取文本——`config` 文件夹旁 `lang/<语言>.yml` 中的 `notify_new_mail` 与
+  `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置，也应在那里修改。这两个条目的占位符与被移除的
+  键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
+  （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
+  填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
+  同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
+  服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
+  为它记录一条警告，指出文件、键名以及应改为修改的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。

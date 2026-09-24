@@ -17,16 +17,19 @@ import lombok.Setter;
  */
 @Getter
 @Setter
-@ConfigEntity("config/mail.yml")
+@ConfigEntity(MailConfig.CONFIG_FILE)
 public class MailConfig extends AbstractConfigEntity {
+
+    /**
+     * This entity's file, relative to the module's folder. The one place the path is written: the
+     * annotation above, the constructor and the removed-key check in {@code UltiMail} all read it
+     * from here, so they cannot drift apart (UltiKits/UltiMail#23).
+     */
+    public static final String CONFIG_FILE = "config/mail.yml";
     
     @ConfigEntry(path = "max-items", comment = "每封邮件最多附带物品数量")
     @Range(min = 1, max = 54)
     private int maxItems = 27;
-
-    @ConfigEntry(path = "mail-expire-days", comment = "邮件过期天数（0为永不过期）")
-    @Range(min = 0, max = 365)
-    private int mailExpireDays = 30;
 
     @ConfigEntry(path = "notify-on-join", comment = "玩家登录时通知未读邮件")
     private boolean notifyOnJoin = true;
@@ -47,14 +50,6 @@ public class MailConfig extends AbstractConfigEntity {
     @Range(min = 0, max = 300)
     private int sendCooldown = 10;
     
-    @ConfigEntry(path = "messages.new-mail", comment = "新邮件通知")
-    @NotEmpty
-    private String newMailMessage = "&e[邮件] &f你有 &a{COUNT} &f封未读邮件！使用 /mail inbox 查看";
-
-    @ConfigEntry(path = "messages.mail-sent", comment = "邮件发送成功")
-    @NotEmpty
-    private String mailSentMessage = "&a邮件已发送给 {PLAYER}！";
-
     @ConfigEntry(path = "messages.mail-received", comment = "收到新邮件")
     @NotEmpty
     private String mailReceivedMessage = "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！";
@@ -111,6 +106,6 @@ public class MailConfig extends AbstractConfigEntity {
     private String recallEmailContent = "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
     
     public MailConfig() {
-        super("config/mail.yml");
+        super(CONFIG_FILE);
     }
 }

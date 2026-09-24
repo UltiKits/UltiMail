@@ -1,6 +1,12 @@
 package com.ultikits.plugins.mail.config;
 
+import com.ultikits.ultitools.annotations.ConfigEntry;
+
 import org.junit.jupiter.api.*;
+
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,6 +23,55 @@ class MailConfigTest {
     @BeforeEach
     void setUp() {
         config = new MailConfig();
+    }
+
+    /**
+     * UltiKits/UltiMail#23. Three keys were declared, validated and written into every operator's
+     * {@code config/mail.yml}, and read by nothing: {@code mail-expire-days} described an expiry
+     * that does not exist (feature request UltiKits/UltiMail#34), and {@code messages.new-mail} /
+     * {@code messages.mail-sent} duplicated text the language catalogue already supplies
+     * ({@code notify_new_mail}, {@code mail_sent_success}) -- the maintainer's message-text decision
+     * of 2026-09-22. All three are removed rather than wired.
+     * <p>
+     * Asserted over the declared surface, because that is the only place the framework learns which
+     * keys to write: a {@code @ConfigEntry} carrying one of these paths would put the key back into
+     * every fresh {@code mail.yml}. The written form is "it must declare exactly this surface", so it
+     * fails while the keys are still declared, not merely stops compiling once they are gone.
+     */
+    @Nested
+    @DisplayName("removed keys (UltiKits/UltiMail#23)")
+    class RemovedKeyTests {
+
+        private List<String> declaredPaths() {
+            List<String> paths = new ArrayList<>();
+            for (Field field : MailConfig.class.getDeclaredFields()) {
+                ConfigEntry entry = field.getAnnotation(ConfigEntry.class);
+                if (entry != null) {
+                    paths.add(entry.path());
+                }
+            }
+            return paths;
+        }
+
+        @Test
+        @DisplayName("declares none of mail-expire-days, messages.new-mail, messages.mail-sent; still declares their siblings")
+        void declaresNoneOfTheRemovedKeys() {
+            List<String> paths = declaredPaths();
+
+            // Positive controls: the scan reads the annotations, and the one message key in the
+            // same block that IS read (MailService#notifyReceiver) stays.
+            assertThat(paths).contains("max-items", "notify-on-join", "messages.mail-received");
+            assertThat(paths).doesNotContain(
+                    "mail-expire-days", "messages.new-mail", "messages.mail-sent");
+        }
+
+        @Test
+        @DisplayName("declares exactly 20 keys, three fewer than before UltiKits/UltiMail#23")
+        void declaresTwentyKeys() {
+            // FEATURES.md's ## Configuration and UAT-CHECKLIST.md's ultimail.config.mail-yml row both
+            // count this number; 23 before the removal.
+            assertThat(declaredPaths()).hasSize(20);
+        }
     }
 
     @Nested
@@ -57,12 +112,6 @@ class MailConfigTest {
         @DisplayName("sendCooldown 默认应该为 10")
         void shouldDefaultSendCooldownTo10() {
             assertThat(config.getSendCooldown()).isEqualTo(10);
-        }
-        
-        @Test
-        @DisplayName("mailExpireDays 默认应该为 30")
-        void shouldDefaultMailExpireDaysTo30() {
-            assertThat(config.getMailExpireDays()).isEqualTo(30);
         }
         
         @Test
@@ -117,17 +166,11 @@ class MailConfigTest {
         @Test
         @DisplayName("应该正确设置和获取消息模板")
         void shouldSetAndGetMessageTemplates() {
-            String newMailMsg = "&6你有新邮件！";
             String receivedMsg = "&e收到新邮件！";
-            String sentMsg = "&a发送成功！";
 
-            config.setNewMailMessage(newMailMsg);
             config.setMailReceivedMessage(receivedMsg);
-            config.setMailSentMessage(sentMsg);
 
-            assertThat(config.getNewMailMessage()).isEqualTo(newMailMsg);
             assertThat(config.getMailReceivedMessage()).isEqualTo(receivedMsg);
-            assertThat(config.getMailSentMessage()).isEqualTo(sentMsg);
         }
 
         @Test
@@ -137,13 +180,11 @@ class MailConfigTest {
             config.setMaxContentLength(1000);
             config.setMaxItems(54);
             config.setSendCooldown(30);
-            config.setMailExpireDays(60);
 
             assertThat(config.getMaxSubjectLength()).isEqualTo(100);
             assertThat(config.getMaxContentLength()).isEqualTo(1000);
             assertThat(config.getMaxItems()).isEqualTo(54);
             assertThat(config.getSendCooldown()).isEqualTo(30);
-            assertThat(config.getMailExpireDays()).isEqualTo(60);
         }
         
         @Test
@@ -203,13 +244,6 @@ class MailConfigTest {
             config.setSendCooldown(0);
             assertThat(config.getSendCooldown()).isEqualTo(0);
         }
-        
-        @Test
-        @DisplayName("mailExpireDays 可以设置为 0 (永不过期)")
-        void shouldAllowZeroExpireDays() {
-            config.setMailExpireDays(0);
-            assertThat(config.getMailExpireDays()).isEqualTo(0);
-        }
     }
 
     @Nested
@@ -217,24 +251,10 @@ class MailConfigTest {
     class PlaceholderTests {
 
         @Test
-        @DisplayName("新邮件消息应该包含 {COUNT} 占位符")
-        void newMailMessageShouldHaveCountPlaceholder() {
-            String message = config.getNewMailMessage();
-            assertThat(message).contains("{COUNT}");
-        }
-
-        @Test
         @DisplayName("收到邮件消息应该包含 {SENDER} 占位符")
         void receivedMessageShouldHaveSenderPlaceholder() {
             String message = config.getMailReceivedMessage();
             assertThat(message).contains("{SENDER}");
-        }
-        
-        @Test
-        @DisplayName("邮件发送消息应该包含 {PLAYER} 占位符")
-        void sentMessageShouldHavePlayerPlaceholder() {
-            String message = config.getMailSentMessage();
-            assertThat(message).contains("{PLAYER}");
         }
         
         @Test
@@ -283,27 +303,6 @@ class MailConfigTest {
     @Nested
     @DisplayName("Setter 测试")
     class SetterTests {
-
-        @Test
-        @DisplayName("应该正确设置 mailExpireDays")
-        void shouldSetMailExpireDays() {
-            config.setMailExpireDays(60);
-            assertThat(config.getMailExpireDays()).isEqualTo(60);
-        }
-
-        @Test
-        @DisplayName("应该正确设置 newMailMessage")
-        void shouldSetNewMailMessage() {
-            config.setNewMailMessage("custom");
-            assertThat(config.getNewMailMessage()).isEqualTo("custom");
-        }
-
-        @Test
-        @DisplayName("应该正确设置 mailSentMessage")
-        void shouldSetMailSentMessage() {
-            config.setMailSentMessage("sent msg");
-            assertThat(config.getMailSentMessage()).isEqualTo("sent msg");
-        }
 
         @Test
         @DisplayName("应该正确设置 mailReceivedMessage")
