@@ -161,9 +161,9 @@ class RemovedConfigKeysTest {
      * with the bundled text, so each message warning names the placeholder to use and the one it
      * replaces.
      * <p>
-     * Codex P2 on #35: the join notification does not yet substitute {@code {0}} (it replaces
-     * {@code {COUNT}}, UltiKits/UltiMail#24), so the new-mail warning must not claim that {@code {0}}
-     * renders the unread count; it names #24 instead. {@code {RECEIVER}} is substituted today.
+     * The join notification does not yet substitute {@code {0}} (it replaces {@code {COUNT}},
+     * UltiKits/UltiMail#24), so the new-mail warning must not claim that {@code {0}} renders
+     * the unread count; it names #24 instead. {@code {RECEIVER}} is substituted today.
      */
     @Test
     @DisplayName("the two message warnings name the catalogue placeholder, and the old one it replaces")
