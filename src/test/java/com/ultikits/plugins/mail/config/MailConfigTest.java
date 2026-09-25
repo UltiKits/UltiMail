@@ -251,22 +251,28 @@ class MailConfigTest {
     class PlaceholderTests {
 
         @Test
-        @DisplayName("收到邮件消息应该包含 {SENDER} 占位符")
-        void receivedMessageShouldHaveSenderPlaceholder() {
+        @DisplayName("收到邮件消息（语言文件的 notify_mail_received）应该包含 {0} 发件人占位符")
+        void receivedMessageShouldHaveSenderPlaceholder() throws Exception {
+            com.ultikits.plugins.mail.utils.TestHelper.bindPlugin(config,
+                    com.ultikits.plugins.mail.utils.TestHelper.pluginIn("zh"));
             String message = config.getMailReceivedMessage();
-            assertThat(message).contains("{SENDER}");
+            assertThat(message).contains("{0}");
         }
         
         @Test
         @DisplayName("召回邮件标题应该包含 {SERVER} 占位符")
-        void recallSubjectShouldHaveServerPlaceholder() {
+        void recallSubjectShouldHaveServerPlaceholder() throws Exception {
+            com.ultikits.plugins.mail.utils.TestHelper.bindPlugin(config,
+                    com.ultikits.plugins.mail.utils.TestHelper.pluginIn("zh"));
             String subject = config.getRecallSubject();
             assertThat(subject).contains("{SERVER}");
         }
         
         @Test
         @DisplayName("召回邮件内容应该包含 {SERVER} 和 {SENDER} 占位符")
-        void recallContentShouldHavePlaceholders() {
+        void recallContentShouldHavePlaceholders() throws Exception {
+            com.ultikits.plugins.mail.utils.TestHelper.bindPlugin(config,
+                    com.ultikits.plugins.mail.utils.TestHelper.pluginIn("zh"));
             String content = config.getRecallContent();
             assertThat(content).contains("{SERVER}");
             assertThat(content).contains("{SENDER}");
@@ -292,7 +298,9 @@ class MailConfigTest {
         
         @Test
         @DisplayName("召回电子邮件配置应该有正确的占位符")
-        void recallEmailShouldHavePlaceholders() {
+        void recallEmailShouldHavePlaceholders() throws Exception {
+            com.ultikits.plugins.mail.utils.TestHelper.bindPlugin(config,
+                    com.ultikits.plugins.mail.utils.TestHelper.pluginIn("zh"));
             assertThat(config.getRecallEmailSubject()).contains("{SERVER}");
             assertThat(config.getRecallEmailContent()).contains("{PLAYER}");
             assertThat(config.getRecallEmailContent()).contains("{SERVER}");

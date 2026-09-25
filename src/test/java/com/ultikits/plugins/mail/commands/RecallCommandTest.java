@@ -80,8 +80,13 @@ class RecallCommandTest {
         DataOperator<MailData> mockDataOperator = mock(DataOperator.class);
         when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mockDataOperator);
 
-        // Use real MailConfig with defaults
+        // The module's text comes from its language file: answered from the real zh catalogue, the
+        // language every Chinese assertion below quotes (UltiKits/UltiMail#22).
+        lenient().when(mockPlugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("zh"));
+
+        // Use real MailConfig with defaults, bound to the plugin as the framework binds it
         config = new MailConfig();
+        TestHelper.bindPlugin(config, mockPlugin);
 
         // Setup players
         lenient().when(player.getName()).thenReturn("NormalPlayer");
@@ -124,6 +129,67 @@ class RecallCommandTest {
     void tearDown() {
         mockedBukkit.close();
         TestHelper.cleanupMocks();
+    }
+
+    // ==================== Language (UltiKits/UltiMail#22) ====================
+
+    @Nested
+    @DisplayName("/recall follows the language setting (UltiKits/UltiMail#22)")
+    class LanguageTests {
+
+        private String en(String key) {
+            return com.ultikits.plugins.mail.i18n.CatalogueText.text("en", key);
+        }
+
+        @Test
+        @DisplayName("under language: en the refusal, progress, summary and help are the English catalogue text")
+        void recallTextIsEnglish() throws Exception {
+            when(mockPlugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            config.setEmailEnabled(true);
+            String refusal = org.bukkit.ChatColor.RED + en("recall_no_permission");
+            String sending = org.bukkit.ChatColor.YELLOW + en("recall_sending");
+            String done = org.bukkit.ChatColor.GREEN + en("recall_done");
+            String found = org.bukkit.ChatColor.AQUA + en("recall_players_found")
+                    .replace("{COUNT}", org.bukkit.ChatColor.WHITE + "0" + org.bukkit.ChatColor.AQUA);
+            String emails = org.bukkit.ChatColor.AQUA + en("recall_emails")
+                    .replace("{COUNT}", org.bukkit.ChatColor.WHITE + "0" + org.bukkit.ChatColor.AQUA);
+            String helpTitle = org.bukkit.ChatColor.GOLD + en("help_recall_title");
+
+            recallCommand.sendRecallWithMessage(player, null);
+            recallCommand.sendRecallWithMessage(adminPlayer, null);
+            CommandSender helpSender = mock(CommandSender.class);
+            Method help = RecallCommand.class.getDeclaredMethod("handleHelp", CommandSender.class);
+            help.setAccessible(true); // NOPMD
+            help.invoke(recallCommand, helpSender);
+
+            verify(player).sendMessage(refusal);
+            verify(adminPlayer).sendMessage(sending);
+            verify(adminPlayer).sendMessage(done);
+            verify(adminPlayer).sendMessage(found);
+            verify(adminPlayer).sendMessage(emails);
+            verify(helpSender).sendMessage(helpTitle);
+        }
+
+        @Test
+        @DisplayName("under language: en the recall mail's subject and content are the English catalogue text")
+        void recallMailIsEnglish() throws Exception {
+            when(mockPlugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            @SuppressWarnings("unchecked")
+            DataOperator<MailData> mailDataOperator = mock(DataOperator.class);
+            when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailDataOperator);
+            String subject = en("recall_subject").replace("{SERVER}", config.getServerName());
+            String content = en("recall_content").replace("{SERVER}", config.getServerName()).replace("{SENDER}", "Admin");
+            Method method = RecallCommand.class.getDeclaredMethod(
+                "sendGameMail", String.class, String.class, String.class, String.class);
+            method.setAccessible(true); // NOPMD
+
+            method.invoke(recallCommand, "uuid-123", "TestPlayer", "Admin", null);
+
+            verify(mailDataOperator).insert(argThat(mail -> {
+                MailData m = (MailData) mail;
+                return subject.equals(m.getSubject()) && content.equals(m.getContent());
+            }));
+        }
     }
 
     // ==================== Permission Tests ====================

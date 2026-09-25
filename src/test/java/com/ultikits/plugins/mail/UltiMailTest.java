@@ -199,7 +199,8 @@ class UltiMailTest {
             UltiMail plugin = mock(UltiMail.class);
             logger = mock(PluginLogger.class);
             lenient().when(plugin.getLogger()).thenReturn(logger);
-            lenient().when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            // The warnings come from the language file; answered from the real en catalogue.
+            lenient().when(plugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
             when(plugin.operatorConfigFile()).thenReturn(file);
             return plugin;
         }
@@ -262,7 +263,7 @@ class UltiMailTest {
             UltiMail plugin = mock(UltiMail.class);
             logger = mock(PluginLogger.class);
             when(plugin.getLogger()).thenReturn(logger);
-            when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+            when(plugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
             when(plugin.operatorConfigFile())
                     .thenThrow(new UncheckedIOException(new IOException("disk unavailable")));
             when(plugin.registerSelf()).thenCallRealMethod();

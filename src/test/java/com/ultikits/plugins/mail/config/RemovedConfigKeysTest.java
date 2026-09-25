@@ -59,9 +59,47 @@ class RemovedConfigKeysTest {
     }
 
     private static List<String> warningsFor(File file) {
+        return warningsFor(file, "en");
+    }
+
+    /**
+     * Runs the check with a module whose language file is the real {@code language} catalogue. The
+     * check takes the module since its text moved to the language file; it is called by reflection,
+     * whichever signature this tree has, so this file compiles against both.
+     */
+    private static List<String> warningsFor(File file, String language) {
         List<String> warnings = new ArrayList<>();
-        RemovedConfigKeys.warnAboutLeftovers(file, warnings::add);
-        return warnings;
+        java.util.function.Consumer<String> sink = warnings::add;
+        com.ultikits.ultitools.abstracts.UltiToolsPlugin plugin =
+                org.mockito.Mockito.mock(com.ultikits.ultitools.abstracts.UltiToolsPlugin.class);
+        org.mockito.Mockito.when(plugin.i18n(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer(language));
+        try {
+            for (java.lang.reflect.Method m : RemovedConfigKeys.class.getMethods()) {
+                if (m.getName().equals("warnAboutLeftovers")) {
+                    if (m.getParameterCount() == 3) {
+                        m.invoke(null, file, sink, plugin);
+                    } else {
+                        m.invoke(null, file, sink);
+                    }
+                    return warnings;
+                }
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+        throw new AssertionError("no warnAboutLeftovers method");
+    }
+
+    @Test
+    @DisplayName("Under language: zh the warning is the Chinese catalogue text, naming the file and the key")
+    void warningFollowsTheLanguageSetting(@TempDir File dir) throws IOException {
+        File file = write(dir, "mail-expire-days: 30\n");
+        String expected = com.ultikits.plugins.mail.i18n.CatalogueText.text("zh", "removed_key_warning").replace("{FILE}", file.getPath())
+                .replace("{REASON}", com.ultikits.plugins.mail.i18n.CatalogueText.text("zh", "removed_key_reason_mail_expire_days"))
+                .replace("{KEY}", "mail-expire-days");
+
+        assertThat(warningsFor(file, "zh")).containsExactly(expected);
     }
 
     @Test

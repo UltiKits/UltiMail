@@ -78,11 +78,16 @@ class UltiMailRemovedKeyEndToEndTest {
 
         UltiMail plugin = mock(UltiMail.class, CALLS_REAL_METHODS);
         setField(UltiToolsPlugin.class, plugin, "resourceFolderPath", moduleFolder.toString());
-        new ConfigManager().register(plugin, new MailConfig());
+        MailConfig config = new MailConfig();
+        new ConfigManager().register(plugin, config);
+        // The module reads its configuration through the framework's registry, which a unit test
+        // has no instance of; hand it the entity just registered.
+        doReturn(config).when(plugin).getConfig(MailConfig.class);
 
         logger = mock(PluginLogger.class);
         doReturn(logger).when(plugin).getLogger();
-        doAnswer(inv -> inv.getArgument(0)).when(plugin).i18n(anyString());
+        // The warnings come from the language file; answered from the real en catalogue.
+        doAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en")).when(plugin).i18n(anyString());
         return plugin;
     }
 

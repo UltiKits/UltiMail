@@ -109,6 +109,9 @@ class MailServiceTest {
         injectField(mailService, "config", config);
         injectField(mailService, "dataOperator", mockDataOperator);
         injectField(mailService, "plugin", mockPlugin);
+        // A blank text setting reads the language file of the plugin the configuration is bound to,
+        // as the framework binds it; answered from the real en catalogue.
+        TestHelper.bindPlugin(config, TestHelper.pluginIn("en"));
     }
 
     @AfterEach
