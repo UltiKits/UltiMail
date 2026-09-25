@@ -1,5 +1,6 @@
 package com.ultikits.plugins.mail;
 
+import com.ultikits.plugins.mail.config.ConfigTextDefaults;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.config.RemovedConfigKeys;
 import com.ultikits.plugins.mail.listener.AttachmentGUIListener;
@@ -32,7 +33,7 @@ public class UltiMail extends UltiToolsPlugin {
         // Deleting a key from MailConfig does nothing to the operator's existing file, so tell them
         // about any key this version no longer reads (UltiKits/UltiMail#23).
         warnAboutRemovedConfigKeys();
-        blankShippedTextDefaults();
+        writeConfigTextInServerLanguage();
         return true;
     }
 
@@ -45,19 +46,25 @@ public class UltiMail extends UltiToolsPlugin {
     @Override
     protected void onReload() {
         warnAboutRemovedConfigKeys();
-        blankShippedTextDefaults();
+        writeConfigTextInServerLanguage();
     }
 
     /**
-     * Blanks every text setting in {@code config/mail.yml} that still holds the default an earlier
-     * version shipped (all were Chinese) and saves the file, so the language file's text takes over in
-     * the server's language; any other value is the operator's and is kept (maintainer ruling
-     * 2026-09-24 (d)). Runs at start-up and on every reload, after the framework has read the file; a
-     * blank value matches no shipped default, so it is never rewritten twice.
+     * Writes every text setting in {@code config/mail.yml} that is still built-in text in the server's
+     * language and saves the file once, so the file holds what the module shows; any other value is the
+     * operator's and is kept (maintainer decision 2026-09-25, UltiKits/UltiMail#21, UltiKits/UltiMail#22).
+     * Runs from {@link #registerSelf()} and from {@link #onReload()}, both after the module's language is
+     * loaded -- never from a configuration change listener, which the framework fires before it reloads
+     * the language. A value already in the current language matches nothing to replace, so a second
+     * start writes nothing.
+     * The text comes from this jar's own catalogue for the server's language, not from {@code i18n} (which
+     * reads the operator's extracted language file first), so every value written is one the next pass
+     * recognises (the text source decision of 2026-09-25).
      */
-    private void blankShippedTextDefaults() {
+    private void writeConfigTextInServerLanguage() {
         MailConfig config = getConfig(MailConfig.class);
-        if (config == null || !config.migrateLegacyDefaults()) {
+        if (config == null || !config.materializeText(
+                ConfigTextDefaults.jarLanguage(MailConfig.class, getLanguageCode())::getLocalizedText)) {
             return;
         }
         try {
