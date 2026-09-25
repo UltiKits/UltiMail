@@ -84,7 +84,8 @@ class RecallCommandTest {
         // language every Chinese assertion below quotes (UltiKits/UltiMail#22).
         lenient().when(mockPlugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("zh"));
 
-        // Use real MailConfig with defaults, bound to the plugin as the framework binds it
+        // Use real MailConfig with defaults (the Chinese text an untouched zh server's mail.yml holds),
+        // bound to the plugin as the framework binds it
         config = new MailConfig();
         TestHelper.bindPlugin(config, mockPlugin);
 
@@ -171,9 +172,11 @@ class RecallCommandTest {
         }
 
         @Test
-        @DisplayName("under language: en the recall mail's subject and content are the English catalogue text")
+        @DisplayName("the recall mail's subject and content are the configured text, here the English text config/mail.yml holds under language: en")
         void recallMailIsEnglish() throws Exception {
             when(mockPlugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            config.setRecallSubject(en("recall_subject"));
+            config.setRecallContent(en("recall_content"));
             @SuppressWarnings("unchecked")
             DataOperator<MailData> mailDataOperator = mock(DataOperator.class);
             when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailDataOperator);

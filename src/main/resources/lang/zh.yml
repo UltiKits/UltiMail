@@ -67,7 +67,6 @@ error_player_only: "只有玩家可以执行此命令！"
 notify_new_mail: "&e[邮件] &f你有 &a{0} &f封未读邮件！"
 notify_click_to_view: "&e[点击查看]"
 notify_hover_text: "点击打开收件箱"
-notify_mail_received: "&e[邮件] &f你收到了来自 &a{0} &f的新邮件！"
 
 # === GUI 相关 ===
 gui_close: "关闭"
@@ -129,6 +128,9 @@ recall_subject: "[{SERVER}] 回归召唤"
 recall_content: "亲爱的玩家，{SERVER}想念你了！\n\n快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}"
 recall_email_subject: "[{SERVER}] 我们想念你！"
 recall_email_content: "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}"
+# config/mail.yml 中的文本（messages.mail-received、recall.server-name），仍为内置文本时按服务器语言写入该文件
+mail_received: "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"
+recall_server_name: "Minecraft服务器"
 help_recall_title: "=== 召回系统帮助 ==="
 help_recall_default: "发送默认召回消息"
 help_recall_custom: "发送自定义召回消息"
@@ -149,7 +151,7 @@ log_recall_email_failed: "向 {EMAIL} 发送电子邮件失败：{ERROR}"
 log_recall_no_ultilogin: "未找到 UltiLogin，改用邮件数据查找已注册玩家"
 log_attachment_close_failed: "卸载时无法关闭一个附件选择界面；其中的物品已归还给其所有者"
 log_removed_key_check_failed: "无法检查 {FILE} 中已移除的配置键；模块将跳过这项检查继续运行。"
-log_config_default_save_failed: "替换旧版出厂文本默认值后无法保存 {FILE}；下次启动时会再次替换。"
+log_config_default_save_failed: "按服务器语言写入消息与召回文本后无法保存 {FILE}；本次运行使用新文本，下次启动时会再次写入该文件。"
 
 # === 已移除的配置键 ===
 removed_key_warning: "{FILE} 仍包含 '{KEY}'，当前版本的 UltiMail 已不再读取该键。{REASON} 从文件中删除该键即可消除此警告。"

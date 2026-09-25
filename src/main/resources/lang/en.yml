@@ -67,7 +67,6 @@ error_player_only: "Only players can execute this command!"
 notify_new_mail: "&e[Mail] &fYou have &a{0} &funread mail(s)!"
 notify_click_to_view: "&e[Click to view]"
 notify_hover_text: "Click to open inbox"
-notify_mail_received: "&e[Mail] &fYou received a new mail from &a{0}&f!"
 
 # === GUI Related ===
 gui_close: "Close"
@@ -129,6 +128,9 @@ recall_subject: "[{SERVER}] Come back to us"
 recall_content: "Dear player, {SERVER} misses you!\n\nCome back and take a look, we look forward to seeing you again!\n\nSender: {SENDER}"
 recall_email_subject: "[{SERVER}] We miss you!"
 recall_email_content: "Dear {PLAYER},\n\nThe {SERVER} server misses you! Come back and take a look, we look forward to seeing you again!\n\nSender: {SENDER}"
+# Text config/mail.yml holds (messages.mail-received, recall.server-name), written there in the server's language while it is still built-in text
+mail_received: "&e[Mail] &fYou received a new mail from &a{SENDER}&f!"
+recall_server_name: "Minecraft Server"
 help_recall_title: "=== Recall Help ==="
 help_recall_default: "Send the default recall message"
 help_recall_custom: "Send a custom recall message"
@@ -149,7 +151,7 @@ log_recall_email_failed: "Failed to send email to {EMAIL}: {ERROR}"
 log_recall_no_ultilogin: "UltiLogin not found, using mail data to find registered players"
 log_attachment_close_failed: "Could not close an attachment selector during unload; its items were already returned to their owner"
 log_removed_key_check_failed: "Could not check {FILE} for removed configuration keys; the module continues without that check."
-log_config_default_save_failed: "Could not save {FILE} after replacing the old shipped text defaults; they are replaced again at the next start."
+log_config_default_save_failed: "Could not save {FILE} after writing its message and recall texts in the server's language; the new text is used this session, and the file is written again at the next start."
 
 # === Removed Configuration Keys ===
 removed_key_warning: "{FILE} still contains '{KEY}', which this version of UltiMail no longer reads. {REASON} Delete the key from the file to silence this warning."

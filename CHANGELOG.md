@@ -9,21 +9,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The five text settings in `config/mail.yml` (`messages.mail-received`, `recall.subject`,
-  `recall.content`, `email.recall-subject`, `email.recall-content`) now follow `language` unless you
-  have customised them. Their default is now blank, and a blank value uses the language file's text in
-  the server's language; previously the default was fixed Chinese text, so `language: en` had no
-  effect on the new-mail notice or on recall mails. On upgrade, at start-up and on every
-  `/ul reload`, a value that is exactly the Chinese default an earlier version shipped is replaced
-  with a blank value and the file is saved; any other value is yours and is used as written. The
-  language file's new-mail notice names the sender `{0}`; a configured value keeps using `{SENDER}`.
-  `recall.server-name` is unchanged: it is your server's name.
-- `config/mail.yml` 中的五项文本设置（`messages.mail-received`、`recall.subject`、`recall.content`、
-  `email.recall-subject`、`email.recall-content`）现在除非被你自定义，否则跟随 `language`。它们的默认值现为空，
-  空值会以服务器语言使用语言文件中的文本；此前默认值是写死的中文，所以 `language: en` 对新邮件提醒和召回邮件都不起作用。
-  升级后，在启动时以及每次 `/ul reload` 时，与旧版本出厂中文默认值完全相同的值会被替换为空值并保存文件；其他任何值都视为
-  你的自定义，按原样使用。语言文件里的新邮件提醒用 `{0}` 表示发件人；你配置的值继续使用 `{SENDER}`。`recall.server-name`
-  不变：它是你服务器的名字。
+- Message and title settings in `config/mail.yml` — the new-mail notice (`messages.mail-received`), the
+  server name recall mails carry (`recall.server-name`), and the recall mail and email texts
+  (`recall.subject`, `recall.content`, `email.recall-subject`, `email.recall-content`) — are written in the
+  server's language when the module starts, and the file is what the module shows (for example
+  `recall.subject: '[{SERVER}] Come back to us'` and `recall.server-name: Minecraft Server` under
+  `language: en`); previously they were fixed Chinese text, so `language: en` had no effect on the new-mail
+  notice or on recall mails. A setting that is still built-in text — in any language, or a default an
+  earlier version shipped — follows `language`: it is rewritten when the module starts or after
+  `/ul reload`. A setting you edited is kept, so a `recall.server-name` you set to your server's name stays
+  as it is. To keep a built-in text but stop it following `language`, change at least one character
+  (UltiKits/UltiMail#22). The text written is this module's built-in text: edit these settings in
+  `config/mail.yml`; an edit of the extracted language file does not change them (earlier versions never
+  read them from the language file either). The new-mail notice names the sender `{SENDER}`, as before.
+- `config/mail.yml` 中的消息与标题设置——新邮件提醒（`messages.mail-received`）、召回邮件使用的服务器名称
+  （`recall.server-name`）以及召回邮件和电子邮件的文本（`recall.subject`、`recall.content`、`email.recall-subject`、
+  `email.recall-content`）——在模块启动时按服务器语言写入，文件内容即模块显示的内容；此前它们是写死的中文，
+  `language: en` 对新邮件提醒和召回邮件都不起作用。仍为内置文本（任一语言的内置文本，或旧版本的出厂默认值）的设置会跟随
+  `language`：模块启动或执行 `/ul reload` 后改写为当前语言的文本。你改过的设置保持不变，因此你已改成自己服务器名字的
+  `recall.server-name` 会原样保留。若想保留内置文本又不让它跟随语言，请至少改动一个字符（UltiKits/UltiMail#22）。
+  写入的是本模块的内置文本：请在 `config/mail.yml` 中修改这些设置；修改已解压的语言文件不会改变它们（旧版本同样从不从
+  语言文件读取它们）。新邮件提醒仍用 `{SENDER}` 表示发件人。
 
 ### Fixed
 
