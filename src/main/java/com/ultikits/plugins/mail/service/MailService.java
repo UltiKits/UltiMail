@@ -508,9 +508,10 @@ public class MailService {
      * The commands are a one-time hand-over like an attachment, so they follow the same decision
      * (UltiKits/UltiMail#31): the executed marker is written <b>before</b> any command runs. When it
      * cannot be written, no command runs and the reader is told, so reading the mail again retries.
-     * After a successful write each command runs in its own guard: one that throws is logged at
-     * WARNING, naming the mail and the command, and is not retried - the marker is already written -
-     * and it does not stop the commands after it. Before, the marker was written after every command
+     * After a successful write each command runs in its own guard: one that throws, or that the server
+     * reports it did not run ({@code false}: an unknown or refused command), is logged at WARNING,
+     * naming the mail and the command, and is not retried - the marker is already written - and it
+     * does not stop the commands after it. Before, the marker was written after every command
      * had run, so a failed write or a command that threw part-way ran the earlier commands again on
      * the next read.
      * <p>
@@ -550,11 +551,19 @@ public class MailService {
                 // Replace placeholders
                 processedCmd = command.replace("%player%", player.getName());
                 // Check if console command
+                boolean ran;
                 if (processedCmd.toLowerCase().startsWith("console:")) {
                     String consoleCmd = processedCmd.substring(8).trim();
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), consoleCmd);
+                    ran = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), consoleCmd);
                 } else {
-                    player.performCommand(processedCmd);
+                    ran = player.performCommand(processedCmd);
+                }
+                // The server answers false for a command it did not run (unknown, or refused by its
+                // executor) instead of throwing; it is not retried either, so it is logged the same way.
+                if (!ran) {
+                    plugin.getLogger().warn(fillOnce(plugin.i18n("log_mail_command_rejected"),
+                            "{MAIL}", String.valueOf(mail.getId()),
+                            "{COMMAND}", processedCmd));
                 }
             } catch (RuntimeException e) {
                 plugin.getLogger().warn(fillOnce(plugin.i18n("log_mail_command_failed"),
