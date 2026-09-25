@@ -342,10 +342,12 @@ public class MailService {
      */
     public void markAsRead(MailData mail) {
         mail.setRead(true);
-        try {
-            dataOperator.update(mail);
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(plugin.i18n("log_mark_read_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
+        // A read flag is not a one-time hand-over, so a failed write is logged and the read goes on.
+        // It must not throw: both hand-overs run right after it, and their refusal replies are what the
+        // reader needs to see during a storage outage (UltiKits/UltiMail#31, gate-1 WR-03).
+        String failure = writeFailure(mail);
+        if (failure != null) {
+            plugin.getLogger().error(plugin.i18n("log_mark_read_failed").replace("{ERROR}", failure));
         }
     }
     
