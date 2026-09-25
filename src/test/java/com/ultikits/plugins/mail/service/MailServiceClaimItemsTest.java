@@ -142,7 +142,7 @@ class MailServiceClaimItemsTest {
                 .as("the claimer must not already hold the item under test")
                 .isZero();
 
-        ItemStack[] claimed = mailService.claimItems(mail, receiver).getItems();
+        ItemStack[] claimed = mailService.claimAttachment(mail, receiver).getItems();
 
         assertThat(claimed).hasSize(1);
         assertThat(countInInventory(Material.DIAMOND))
@@ -161,7 +161,7 @@ class MailServiceClaimItemsTest {
                 .as("the inventory must really be full for the drop path to be reached")
                 .isEqualTo(-1);
 
-        mailService.claimItems(mail, receiver);
+        mailService.claimAttachment(mail, receiver);
 
         assertThat(countInInventory(Material.DIAMOND)).isZero();
         assertThat(countDropped(Material.DIAMOND))
@@ -183,7 +183,7 @@ class MailServiceClaimItemsTest {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 1), null,
                 new ItemStack(Material.GOLD_INGOT, 1));
 
-        ItemStack[] claimed = mailService.claimItems(mail, receiver).getItems();
+        ItemStack[] claimed = mailService.claimAttachment(mail, receiver).getItems();
 
         assertThat(claimed)
                 .as("claimItems still reports what the mail stored, nulls included -- callers such "
@@ -212,7 +212,7 @@ class MailServiceClaimItemsTest {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
         doThrow(new DataAccessException("connection lost")).when(dataOperator).update(any(MailData.class));
 
-        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+        MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
         assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
         assertThat(result.getItems()).isEmpty();
@@ -227,7 +227,7 @@ class MailServiceClaimItemsTest {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
         doThrow(new IllegalAccessException("field not accessible")).when(dataOperator).update(any(MailData.class));
 
-        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+        MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
         assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
         assertThat(countInInventory(Material.DIAMOND)).isZero();
@@ -246,7 +246,7 @@ class MailServiceClaimItemsTest {
             return null;
         }).when(dataOperator).update(any(MailData.class));
 
-        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+        MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
         assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.CLAIMED);
         assertThat(diamondsAtWrite).containsExactly(0);
@@ -261,13 +261,37 @@ class MailServiceClaimItemsTest {
         doThrow(new DataAccessException("connection lost")).doNothing()
                 .when(dataOperator).update(any(MailData.class));
 
-        assertThat(mailService.claimItems(mail, receiver).getStatus())
+        assertThat(mailService.claimAttachment(mail, receiver).getStatus())
                 .isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
-        assertThat(mailService.claimItems(mail, receiver).getStatus())
+        assertThat(mailService.claimAttachment(mail, receiver).getStatus())
                 .isEqualTo(MailService.ClaimResult.Status.CLAIMED);
-        assertThat(mailService.claimItems(mail, receiver).getStatus())
+        assertThat(mailService.claimAttachment(mail, receiver).getStatus())
                 .isEqualTo(MailService.ClaimResult.Status.NOTHING_TO_CLAIM);
 
         assertThat(countInInventory(Material.DIAMOND) + countDropped(Material.DIAMOND)).isEqualTo(2);
+    }
+
+    // ==================== the pre-existing claimItems descriptor (Codex round 1, P1) ====================
+
+    /**
+     * {@code MailService} is advertised to other plugins in this module's README, so the method a
+     * plugin compiled against the previous version calls must keep its descriptor: {@code claimItems}
+     * still takes {@code (MailData, Player)} and returns {@code ItemStack[]}, and a refused claim
+     * returns no items and gives nothing.
+     */
+    @Test
+    @DisplayName("claimItems keeps its ItemStack[] descriptor for plugins compiled against the previous version")
+    void claimItemsKeepsItsDescriptor() throws Exception {
+        Method legacy = MailService.class.getMethod("claimItems", MailData.class, org.bukkit.entity.Player.class);
+        assertThat(legacy.getReturnType()).isEqualTo(ItemStack[].class);
+
+        MailData refused = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        doThrow(new DataAccessException("connection lost")).doNothing().when(dataOperator).update(any(MailData.class));
+        assertThat(mailService.claimItems(refused, receiver)).isEmpty();
+        assertThat(countInInventory(Material.DIAMOND)).isZero();
+        assertThat(refused.isClaimed()).isFalse();
+
+        assertThat(mailService.claimItems(refused, receiver)).hasSize(1);
+        assertThat(countInInventory(Material.DIAMOND)).isEqualTo(2);
     }
 }

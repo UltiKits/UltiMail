@@ -484,7 +484,7 @@ class MailCommandTest {
             when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null, airItem});
             // claimItems returns items
             ItemStack diamond = mock(ItemStack.class);
-            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
+            when(mockMailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
 
             mailCommand.claim(player, 1);
 
@@ -503,7 +503,7 @@ class MailCommandTest {
             when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
             when(mockMailService.getItemCount(mail)).thenReturn(0);
             when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null});
-            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.nothingToClaim());
+            when(mockMailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.nothingToClaim());
 
             mailCommand.claim(player, 1);
 
@@ -528,7 +528,7 @@ class MailCommandTest {
             when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
             when(mockMailService.getItemCount(mail)).thenReturn(1);
             when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null, null});
-            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.notRecorded());
+            when(mockMailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.notRecorded());
 
             mailCommand.claim(player, 1);
 
@@ -811,11 +811,11 @@ class MailCommandTest {
             // All null = empty
             when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null, null, null});
             ItemStack diamond = mock(ItemStack.class);
-            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
+            when(mockMailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
 
             mailCommand.claim(player, 1);
 
-            verify(mockMailService).claimItems(mail, player);
+            verify(mockMailService).claimAttachment(mail, player);
         }
 
         @Test
@@ -832,11 +832,11 @@ class MailCommandTest {
             when(airItem.getType()).thenReturn(Material.AIR);
             when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{airItem, null});
             ItemStack diamond = mock(ItemStack.class);
-            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
+            when(mockMailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{diamond}));
 
             mailCommand.claim(player, 1);
 
-            verify(mockMailService).claimItems(mail, player);
+            verify(mockMailService).claimAttachment(mail, player);
         }
 
         @Test
@@ -856,7 +856,7 @@ class MailCommandTest {
             mailCommand.claim(player, 1);
 
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[claim_inventory_full]")));
-            verify(mockMailService, never()).claimItems(any(), any());
+            verify(mockMailService, never()).claimAttachment(any(), any());
         }
     }
 

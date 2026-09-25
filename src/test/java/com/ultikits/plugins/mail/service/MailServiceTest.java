@@ -704,7 +704,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setClaimed(true);
 
-            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
+            ItemStack[] result = mailService.claimAttachment(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -715,7 +715,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems(null);
 
-            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
+            ItemStack[] result = mailService.claimAttachment(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -726,7 +726,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems("");
 
-            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
+            ItemStack[] result = mailService.claimAttachment(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -1773,6 +1773,24 @@ class MailServiceTest {
         }
 
         /**
+         * Codex round 1 (P2): a null entry in a command list supplied through the API threw outside the
+         * per-command guard after the marker was written, so the valid commands after it never ran.
+         */
+        @Test
+        @DisplayName("a null command entry is logged and skipped, and the commands after it still run")
+        void aNullCommandEntryDoesNotStopTheRest() throws Exception {
+            MailData mail = mailWithCommands("[null,\"give %player% diamond 1\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).containsExactly("give ReceiverPlayer diamond 1");
+            assertThat(mail.isCommandsExecuted()).isTrue();
+            ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
+            verify(serviceLogger(), atLeastOnce()).warn(warning.capture());
+            assertThat(warning.getAllValues()).anyMatch(line -> line.contains("[log_mail_command_failed]"));
+        }
+
+        /**
          * gate-1 IN-01: the warning names the mail and the command, from the real English text, and a
          * command whose own text contains a placeholder token is logged as written, not expanded again.
          */
@@ -1838,7 +1856,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems("not-valid-base64-data");
 
-            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
+            ItemStack[] result = mailService.claimAttachment(mail, receiver).getItems();
 
             // deserializeItems returns empty array on error
             assertThat(result).isEmpty();

@@ -131,7 +131,7 @@ class MailboxGUIClaimTest {
     void aClaimThatCouldNotBeRecordedIsReportedAsRefused() throws Exception {
         MailData mail = unclaimedMailWithItems();
         when(mailService.getItemCount(mail)).thenReturn(1);
-        when(mailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.notRecorded());
+        when(mailService.claimAttachment(mail, player)).thenReturn(MailService.ClaimResult.notRecorded());
 
         click(mail);
 
@@ -145,7 +145,7 @@ class MailboxGUIClaimTest {
     void aRecordedClaimReportsSuccess() throws Exception {
         MailData mail = unclaimedMailWithItems();
         when(mailService.getItemCount(mail)).thenReturn(1);
-        when(mailService.claimItems(mail, player))
+        when(mailService.claimAttachment(mail, player))
                 .thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{new ItemStack(Material.DIAMOND)}));
 
         click(mail);
