@@ -122,7 +122,7 @@ class AttachmentSelectorPageTest {
      * still call {@code InventoryView.getTopInventory()} via {@code invokevirtual} (confirmed by
      * {@code javap} against the shaded jar) -- so on Paper 1.21's interface-shaped
      * {@code InventoryView}, that call throws {@link IncompatibleClassChangeError}. This is a
-     * third-party binary incompatibility unrelated to this plan's fix, not caused by it, and not
+     * third-party binary incompatibility unrelated to this fix, not caused by it, and not
      * fixable by editing this module. By the time it is thrown, {@code setCancelled(...)} and this
      * page's own {@code onConfirm}/{@code onCancel} callback have already run (both precede
      * {@code player.closeInventory()} in the icon's click-action lambda), so the assertions this
