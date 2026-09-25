@@ -270,7 +270,7 @@ class MailServiceClaimItemsTest {
         assertThat(countInInventory(Material.DIAMOND) + countDropped(Material.DIAMOND)).isEqualTo(2);
     }
 
-    // ==================== the pre-existing claimItems descriptor (Codex round 1, P1) ====================
+    // ==================== the pre-existing claimItems descriptor ====================
 
     /**
      * {@code MailService} is advertised to other plugins in this module's README, so the method a

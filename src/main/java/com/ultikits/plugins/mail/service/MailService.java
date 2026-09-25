@@ -545,7 +545,7 @@ public class MailService {
         for (String command : commands) {
             // Everything per command is inside the guard - a null entry from an API caller included - so
             // one bad entry can neither stop the commands after it nor escape after the marker was
-            // written (Codex review round 1).
+            // written.
             String processedCmd = String.valueOf(command);
             try {
                 // Replace placeholders

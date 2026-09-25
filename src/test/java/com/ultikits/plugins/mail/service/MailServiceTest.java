@@ -1770,8 +1770,8 @@ class MailServiceTest {
         }
 
         /**
-         * Codex round 1 (P2): a null entry in a command list supplied through the API threw outside the
-         * per-command guard after the marker was written, so the valid commands after it never ran.
+         * A null entry in a command list supplied through the API threw outside the per-command
+         * guard after the marker was written, so the valid commands after it never ran.
          */
         @Test
         @DisplayName("a null command entry is logged and skipped, and the commands after it still run")
