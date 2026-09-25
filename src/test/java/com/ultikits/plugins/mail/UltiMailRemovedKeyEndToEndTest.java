@@ -28,8 +28,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 /**
- * UltiKits/UltiMail#23, end to end (gate 1 WR-01). {@code UltiMailTest$RemovedKeyCheckWiring} stubs
- * {@code operatorConfigFile()}, so it proves the check is called but not that it reads the file the
+ * UltiKits/UltiMail#23, end to end. {@code UltiMailTest$RemovedKeyCheckWiring} stubs {@code
+ * operatorConfigFile()}, so it proves the check is called but not that it reads the file the
  * framework actually manages: {@code operatorConfigFile()} could resolve any other path, the check
  * would return silently on a file that does not exist, and every upgraded server would look exactly
  * like a clean one. Here nothing about the file is stubbed: the module's folder is a temp directory,

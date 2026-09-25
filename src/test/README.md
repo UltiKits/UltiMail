@@ -77,7 +77,7 @@ src/test/java/com/ultikits/plugins/mail/
 - 消息占位符测试
 - 邮件 SMTP 配置测试
 
-## MockBukkit 迁移历史（2026-09，Phase 14）
+## MockBukkit 迁移历史（2026-09）
 
 `AttachmentSelectorPageTest`、`MailboxGUITest`、`SentboxGUITest` 曾长期携带
 `@Disabled("MockBukkit 与 Java 21 + Paper API 存在兼容性问题，待修复")`，且从未真正运行过。
@@ -112,7 +112,7 @@ ServiceLoader 提供者，与「有没有引导真实测试期服务器」无关
 自身仍是纯 Mockito——其类头写明 "Uses pure Mockito (no MockBukkit)"，全文不出现
 `MockBukkit` 或 `MockBukkitHelper`。
 
-**这条区分贯穿整个 Phase 14，务必分清：**
+**这条区分贯穿整次迁移，务必分清：**
 
 - **注册表常量解析**——`Material.X`、`Sound.X`、`InventoryType.X`、`PotionEffectType.X`
   能否解析、其类初始化能否成功——来自 classpath 上的 ServiceLoader 提供者，**不需要真实服务器**。
