@@ -251,6 +251,32 @@ class SendMailCommandTest {
     class HelpTests {
 
         @Test
+        @DisplayName("under language: en each /sendmail help line shows its command once (gate-1 WR-01, UltiKits/UltiMail#21's class)")
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        void helpLinesShowTheirCommandOnce() throws Exception {
+            java.lang.reflect.Field pluginField = SendMailCommand.class.getDeclaredField("ultiPlugin");
+            pluginField.setAccessible(true);
+            UltiToolsPlugin mockUltiPlugin = (UltiToolsPlugin) pluginField.get(command);
+            when(mockUltiPlugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            String attach = org.bukkit.ChatColor.YELLOW + "/sendmail <player> <subject> attach"
+                    + org.bukkit.ChatColor.WHITE + " - Send mail with attachment";
+
+            command.help(sender);
+
+            org.mockito.ArgumentCaptor<String> lines = org.mockito.ArgumentCaptor.forClass(String.class);
+            verify(sender, atLeast(1)).sendMessage(lines.capture());
+            assertThat(lines.getAllValues()).contains(attach);
+            for (String line : lines.getAllValues()) {
+                String plain = org.bukkit.ChatColor.stripColor(line);
+                int dash = plain.indexOf(" - ");
+                if (dash > 0) {
+                    assertThat(plain.substring(dash + 3)).as("line %s", plain)
+                            .doesNotContain(plain.substring(0, dash));
+                }
+            }
+        }
+
+        @Test
         @DisplayName("帮助命令应该显示信息")
         void shouldShowHelpInfo() {
             command.help(sender);

@@ -668,6 +668,33 @@ class AttachmentGUIListenerTest {
             return total;
         }
 
+        /**
+         * Gate-1 WR-02. When a selector cannot be closed during unload (in this test environment the
+         * library's close really fails, which is what drives the catch), the console warning is the
+         * language file's text in the server's language, through the module's logger. The plugin is
+         * injected only when the listener declares one, so this runs before and after the change.
+         */
+        @Test
+        @DisplayName("under language: zh the unload close-failure warning is the Chinese catalogue text")
+        void closeFailureWarningFollowsTheLanguageSetting() throws Exception {
+            UltiToolsPlugin zhPlugin = TestHelper.pluginIn("zh");
+            com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger = zhPlugin.getLogger();
+            try {
+                TestHelper.injectField(listener, "plugin", zhPlugin);
+            } catch (NoSuchFieldException absent) {
+                // the listener does not read the language file yet
+            }
+            String expected = com.ultikits.plugins.mail.i18n.CatalogueText.text("zh", "log_attachment_close_failed");
+            placeItemInContentArea(0, 3);
+
+            listener.returnEveryOpenSelector();
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("control: the unload return still happened").isEqualTo(3);
+            org.mockito.Mockito.verify(logger, org.mockito.Mockito.atLeastOnce())
+                    .warn(org.mockito.ArgumentMatchers.any(Throwable.class), org.mockito.ArgumentMatchers.eq(expected));
+        }
+
         @Test
         @DisplayName("卸载时应把每一个打开中的选择界面里的物品归还其所有者")
         void unloadingReturnsTheItemsOfEveryOpenSelector() {
