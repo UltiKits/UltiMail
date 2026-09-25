@@ -9,6 +9,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The join notification now shows the real unread count, one pair of brackets around
+  `[Click to view]`, and colour where it used to show `&` codes: it read
+  `&e[Mail] &fYou have &a{0} &funread mail(s)! [&e[Click to view]]`. Clicking it still opens the
+  inbox (UltiKits/UltiMail#24).
+- 登录时的邮件提醒现在会显示真实的未读数量、`[Click to view]` 只有一对方括号，原先显示 `&` 代码的地方现在显示为颜色：
+  此前它显示为 `&e[Mail] &fYou have &a{0} &funread mail(s)! [&e[Click to view]]`。点击它仍会打开收件箱
+  （UltiKits/UltiMail#24）。
+
 - Reloading this module (`/ul reload UltiMail`, or `/ul reload` for every module) now re-reads
   `config/mail.yml` and refreshes the language files, so an edited value such as
   `max-subject-length` applies to the next mail without a restart. Previously this module's reload
