@@ -28,7 +28,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 /**
- * Hand-over tests for {@link MailService#claimItems}, gate 1 MN-03.
+ * Hand-over tests for {@link MailService#claimItems}.
  * <p>
  * <b>Why this is a separate class from {@link MailServiceTest}.</b> That class is pure Mockito by
  * design and bootstraps no server, so {@code MailService}'s Base64 item serialization cannot run
@@ -38,11 +38,10 @@ import static org.mockito.Mockito.mock;
  * real MockBukkit server so a mail can carry genuinely serialized attachments and the hand-over can
  * be asserted against a real inventory and real dropped entities.
  * <p>
- * What MN-03 found: {@code claimItems} performed the {@code addItem} then
- * {@code dropItemNaturally(overflow)} sequence by hand, duplicating {@code ItemReturns#giveOrDrop}
- * -- whose own javadoc claims to be "the single place this module hands items back to a player".
- * The declaration and the code disagreed, which is the defect class this milestone exists to
- * remove.
+ * What was wrong: {@code claimItems} performed the {@code addItem} then {@code
+ * dropItemNaturally(overflow)} sequence by hand, duplicating {@code ItemReturns#giveOrDrop} --
+ * whose own javadoc claims to be "the single place this module hands items back to a player".
+ * The declaration and the code disagreed; these tests keep them in agreement.
  */
 @DisplayName("MailService#claimItems 交付测试 (UltiKits/UltiMail#27)")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)

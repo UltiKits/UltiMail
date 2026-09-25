@@ -1,6 +1,8 @@
 package com.ultikits.plugins.mail.listener;
 
 import com.ultikits.plugins.mail.gui.AttachmentSelectorPage;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.EventListener;
 
 import mc.obliviate.inventory.Gui;
@@ -61,6 +63,10 @@ import java.util.logging.Logger;
 public class AttachmentGUIListener implements Listener {
 
     private static final Logger LOGGER = Logger.getLogger(AttachmentGUIListener.class.getName());
+
+    /** The module, whose logger and language file carry the unload close-failure warning. */
+    @Autowired
+    private UltiToolsPlugin plugin;
 
     /**
      * The attachment selector each player currently has open. An entry exists from the moment the
@@ -211,9 +217,12 @@ public class AttachmentGUIListener implements Listener {
         try {
             page.player.closeInventory();
         } catch (RuntimeException | Error e) {
-            LOGGER.log(Level.WARNING,
-                    "Could not close an attachment selector during unload; its items were already "
-                            + "returned to their owner", e);
+            if (plugin != null) {
+                plugin.getLogger().warn(e, plugin.i18n("log_attachment_close_failed"));
+            } else {
+                // Only an instance built outside the container has no plugin; it logs the key.
+                LOGGER.log(Level.WARNING, "log_attachment_close_failed", e);
+            }
         }
     }
 

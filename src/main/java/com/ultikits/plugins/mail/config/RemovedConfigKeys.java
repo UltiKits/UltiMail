@@ -3,6 +3,8 @@ package com.ultikits.plugins.mail.config;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -27,32 +29,18 @@ import java.util.function.Consumer;
 public final class RemovedConfigKeys {
 
     /**
-     * Every key removed from {@code config/mail.yml}, mapped to what an operator should be told
-     * about it. Insertion order is the order the warnings are emitted in.
+     * Every key removed from {@code config/mail.yml}, mapped to the language-file key of what an
+     * operator should be told about it. Insertion order is the order the warnings are emitted in.
+     * The values are informational: the text is read by {@link #reasonFor}, whose literal lookups the
+     * language guard checks, so a key added here needs a case there too (a missing case fails loudly).
      */
     private static final Map<String, String> REMOVED;
 
     static {
         Map<String, String> removed = new LinkedHashMap<String, String>();
-        removed.put("mail-expire-days",
-                "It never had an effect: this module has no mail expiry, and a mail is kept until "
-                        + "a player deletes it. Mail expiry is a feature request, "
-                        + "UltiKits/UltiMail#34 (UltiKits/UltiMail#23).");
-        removed.put("messages.new-mail",
-                "Its value was never shown to players. The unread-mail notification on join takes "
-                        + "its text from the 'notify_new_mail' entry of this module's language file "
-                        + "(lang/<language>.yml, in the same module folder as config/mail.yml), so "
-                        + "it follows the server's language setting; edit it there, keeping that "
-                        + "entry's {0} placeholder where the old key used {COUNT} (an edit that "
-                        + "drops {0} is refused). The notification does not yet put the unread "
-                        + "count into {0}; that is UltiKits/UltiMail#24 (UltiKits/UltiMail#23).");
-        removed.put("messages.mail-sent",
-                "Its value was never shown to players. The confirmation a sender gets after "
-                        + "sending a mail takes its text from the 'mail_sent_success' entry of this "
-                        + "module's language file (lang/<language>.yml, in the same module folder "
-                        + "as config/mail.yml), so it follows the server's language setting; edit "
-                        + "it there, using {RECEIVER} for the receiver's name where the old key "
-                        + "used {PLAYER} (UltiKits/UltiMail#23).");
+        removed.put("mail-expire-days", "removed_key_reason_mail_expire_days");
+        removed.put("messages.new-mail", "removed_key_reason_new_mail");
+        removed.put("messages.mail-sent", "removed_key_reason_mail_sent");
         REMOVED = Collections.unmodifiableMap(removed);
     }
 
@@ -61,9 +49,28 @@ public final class RemovedConfigKeys {
     }
 
     /**
+     * The guidance printed for one removed key, from the language file. Each removed key names its
+     * own entry here, so a key added to {@link #REMOVED} without a case fails loudly instead of being
+     * given another key's explanation.
+     */
+    private static String reasonFor(String removedKey, UltiToolsPlugin plugin) {
+        switch (removedKey) {
+            case "mail-expire-days":
+                return plugin.i18n("removed_key_reason_mail_expire_days");
+            case "messages.new-mail":
+                return plugin.i18n("removed_key_reason_new_mail");
+            case "messages.mail-sent":
+                return plugin.i18n("removed_key_reason_mail_sent");
+            default:
+                throw new IllegalStateException("No guidance for removed key " + removedKey);
+        }
+    }
+
+    /**
      * The keys this class knows about, in the order it reports them.
      *
-     * @return an unmodifiable map of removed key path to the guidance printed for it
+     * @return an unmodifiable map of removed key path to the language-file key of the guidance
+     *         printed for it
      */
     public static Map<String, String> removedKeys() {
         return REMOVED;
@@ -79,8 +86,9 @@ public final class RemovedConfigKeys {
      *
      * @param configFile the operator's {@code config/mail.yml}; may be {@code null}
      * @param warn       where to send each warning, normally the module logger's warn method
+     * @param plugin     the module, whose language file gives the warning its text
      */
-    public static void warnAboutLeftovers(File configFile, Consumer<String> warn) {
+    public static void warnAboutLeftovers(File configFile, Consumer<String> warn, UltiToolsPlugin plugin) {
         if (configFile == null || !configFile.isFile()) {
             return;
         }
@@ -94,10 +102,10 @@ public final class RemovedConfigKeys {
             if (yaml.contains(entry.getKey())) {
                 // No "[UltiMail]" prefix: the module logger adds that itself, and the module is
                 // still named in the sentence for any consumer that does not.
-                warn.accept(configFile.getPath() + " still contains '"
-                        + entry.getKey() + "', which this version of UltiMail no longer reads. "
-                        + entry.getValue()
-                        + " Delete the key from the file to silence this warning.");
+                warn.accept(plugin.i18n("removed_key_warning")
+                        .replace("{FILE}", configFile.getPath())
+                        .replace("{REASON}", reasonFor(entry.getKey(), plugin))
+                        .replace("{KEY}", entry.getKey()));
             }
         }
     }

@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @CmdExecutor(
     alias = {"recall", "callback"},
     permission = "ultimail.recall",
-    description = "召回玩家回归服务器"
+    description = "command_description_recall"
 )
 public class RecallCommand extends BaseCommandExecutor {
 
@@ -69,11 +69,11 @@ public class RecallCommand extends BaseCommandExecutor {
             @CmdParam("message") String message) {
         
         if (!sender.isOp() && !sender.hasPermission("ultimail.recall.admin")) {
-            sender.sendMessage(ChatColor.RED + "你没有权限执行此命令！");
+            sender.sendMessage(ChatColor.RED + plugin.i18n("recall_no_permission"));
             return;
         }
         
-        sender.sendMessage(ChatColor.YELLOW + "正在发送召回通知...");
+        sender.sendMessage(ChatColor.YELLOW + plugin.i18n("recall_sending"));
 
         // Lazy init bukkitPlugin
         if (bukkitPlugin == null) {
@@ -90,14 +90,18 @@ public class RecallCommand extends BaseCommandExecutor {
             
             // Send result back on main thread
             Bukkit.getScheduler().runTask(bukkitPlugin, () -> {
-                sender.sendMessage(ChatColor.GREEN + "召回通知发送完成！");
-                sender.sendMessage(ChatColor.AQUA + "共找到 " + ChatColor.WHITE + totalPlayers + ChatColor.AQUA + " 名注册玩家");
-                sender.sendMessage(ChatColor.AQUA + "游戏内邮件: " + ChatColor.WHITE + gameMails + ChatColor.AQUA + " 封");
+                sender.sendMessage(ChatColor.GREEN + plugin.i18n("recall_done"));
+                sender.sendMessage(ChatColor.AQUA + plugin.i18n("recall_players_found")
+                        .replace("{COUNT}", ChatColor.WHITE + String.valueOf(totalPlayers) + ChatColor.AQUA));
+                sender.sendMessage(ChatColor.AQUA + plugin.i18n("recall_game_mails")
+                        .replace("{COUNT}", ChatColor.WHITE + String.valueOf(gameMails) + ChatColor.AQUA));
                 if (config.isEmailEnabled()) {
-                    sender.sendMessage(ChatColor.AQUA + "电子邮件: " + ChatColor.WHITE + emails + ChatColor.AQUA + " 封");
+                    sender.sendMessage(ChatColor.AQUA + plugin.i18n("recall_emails")
+                            .replace("{COUNT}", ChatColor.WHITE + String.valueOf(emails) + ChatColor.AQUA));
                 }
                 if (failed > 0) {
-                    sender.sendMessage(ChatColor.RED + "失败: " + failed + " 封");
+                    sender.sendMessage(ChatColor.RED + plugin.i18n("recall_failed")
+                            .replace("{COUNT}", String.valueOf(failed)));
                 }
             });
         });
@@ -149,9 +153,9 @@ public class RecallCommand extends BaseCommandExecutor {
                     emails.incrementAndGet();
                 } catch (Exception e) {
                     // Email failed, but game mail may have succeeded
-                    plugin.getLogger().warn(
-                        "Failed to send email to " + playerInfo.email + ": " + e.getMessage()
-                    );
+                    plugin.getLogger().warn(plugin.i18n("log_recall_email_failed")
+                        .replace("{ERROR}", String.valueOf(e.getMessage()))
+                        .replace("{EMAIL}", String.valueOf(playerInfo.email)));
                 }
             }
         }
@@ -305,9 +309,7 @@ public class RecallCommand extends BaseCommandExecutor {
             }
         } catch (Exception e) {
             // UltiLogin not available, fall back to mail data
-            plugin.getLogger().info(
-                "UltiLogin not found, using mail data to find registered players"
-            );
+            plugin.getLogger().info(plugin.i18n("log_recall_no_ultilogin"));
         }
         
         // Also check mail data for any receivers
@@ -354,8 +356,9 @@ public class RecallCommand extends BaseCommandExecutor {
     
     @Override
     protected void handleHelp(CommandSender sender) {
-        sender.sendMessage(ChatColor.GOLD + "=== 召回系统帮助 ===");
-        sender.sendMessage(ChatColor.YELLOW + "/recall" + ChatColor.WHITE + " - 发送默认召回消息");
-        sender.sendMessage(ChatColor.YELLOW + "/recall [自定义消息]" + ChatColor.WHITE + " - 发送自定义召回消息");
+        sender.sendMessage(ChatColor.GOLD + plugin.i18n("help_recall_title"));
+        sender.sendMessage(ChatColor.YELLOW + "/recall" + ChatColor.WHITE + " - " + plugin.i18n("help_recall_default"));
+        sender.sendMessage(ChatColor.YELLOW + "/recall [" + plugin.i18n("arg_recall_message") + "]" + ChatColor.WHITE
+                + " - " + plugin.i18n("help_recall_custom"));
     }
 }

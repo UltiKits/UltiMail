@@ -27,7 +27,7 @@ import java.util.Arrays;
 @CmdExecutor(
     alias = {"sendmail", "sm"},
     permission = "ultimail.send",
-    description = "发送邮件"
+    description = "command_description_sendmail"
 )
 public class SendMailCommand extends BaseCommandExecutor {
 
@@ -77,8 +77,8 @@ public class SendMailCommand extends BaseCommandExecutor {
     @CmdMapping(format = "<player> <subject>")
     public void sendMail(@CmdSender Player sender, @CmdParam("player") String receiver, @CmdParam("subject") String subject) {
         // Exactly the same conversation as the attachment path, carrying no attachment. Building
-        // it here a second time was how the two paths came to differ (UltiKits/UltiMail#27's
-        // gate-1 BL-01: only one of the two ever returned items).
+        // it here a second time was how the two paths came to differ (UltiKits/UltiMail#27:
+        // only one of the two ever returned items).
         startContentConversation(sender, receiver, subject, null);
     }
 
@@ -167,7 +167,7 @@ public class SendMailCommand extends BaseCommandExecutor {
      * case-INSENSITIVE test. Typing {@code Cancel} took the second, which abandons through
      * {@code Conversation#outputNextPrompt}'s no-canceller constructor, so
      * {@code gracefulExit()} was true and the attachment was destroyed
-     * ({@code UltiKits/UltiMail#27}, gate-1 BL-01).
+     * ({@code UltiKits/UltiMail#27}).
      * <p>
      * Wiring the return to the conversation ENDING instead covers every route at once, including
      * routes neither cancel decision knows about: the 120 s inactivity timeout, the owner
@@ -209,8 +209,12 @@ public class SendMailCommand extends BaseCommandExecutor {
         sender.sendMessage(ChatColor.GOLD + "=== " + i18n("help_sendmail_title") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/sendmail <" + i18n("arg_player") + "> <" + i18n("arg_subject") + ">" 
             + ChatColor.WHITE + " - " + i18n("help_sendmail_text"));
-        sender.sendMessage(ChatColor.YELLOW + "/sendmail <" + i18n("arg_player") + "> <" + i18n("arg_subject") + "> attach" 
-            + ChatColor.WHITE + " - " + i18n("help_sendmail_attach"));
+        // help_sendmail_attach already holds the whole line ("/sendmail <player> <subject> attach - ..."),
+        // so it is shown once, the command part yellow and the description white.
+        String attach = i18n("help_sendmail_attach");
+        int dash = attach.indexOf(" - ");
+        sender.sendMessage(dash < 0 ? ChatColor.YELLOW + attach
+            : ChatColor.YELLOW + attach.substring(0, dash) + ChatColor.WHITE + attach.substring(dash));
         sender.sendMessage(ChatColor.GRAY + i18n("help_cancel_hint"));
     }
     

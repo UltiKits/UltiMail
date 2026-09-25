@@ -1247,6 +1247,20 @@ class MailServiceTest {
             ));
         }
 
+        /**
+         * The new-mail notice names the sender with {@code {SENDER}}, the only token the setting has
+         * ever documented and the one every built-in text uses. A literal {@code {0}} in an operator's
+         * text was shown as written by every released version, so it stays as written.
+         */
+        @Test
+        @DisplayName("a literal {0} in a configured new-mail notice is shown as written")
+        void configuredNoticeKeepsLiteralZeroPlaceholder() {
+            config.setMailReceivedMessage("{0}: mail from {SENDER}");
+            mailService.sendMail(sender, "ReceiverPlayer", "subject", "content", null);
+
+            verify(receiver).sendMessage("{0}: mail from SenderPlayer");
+        }
+
         @Test
         @DisplayName("通过isOnline的离线玩家也应查找到")
         void shouldFindReceiverViaIsOnline() {

@@ -632,6 +632,33 @@ class MailCommandTest {
         }
 
         @Test
+        @DisplayName("under language: en the help lists /mail sentgui, and no line shows its command twice (UltiKits/UltiMail#21)")
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        void helpListsSentguiOnce() throws Exception {
+            java.lang.reflect.Field pluginField = MailCommand.class.getDeclaredField("plugin");
+            pluginField.setAccessible(true);
+            UltiToolsPlugin mockPlugin = (UltiToolsPlugin) pluginField.get(mailCommand);
+            when(mockPlugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            when(player.hasPermission("ultimail.admin.sendall")).thenReturn(true);
+            String sentgui = org.bukkit.ChatColor.YELLOW + "/mail sentgui" + org.bukkit.ChatColor.WHITE
+                    + " - Open sentbox GUI";
+
+            mailCommand.help(player);
+
+            ArgumentCaptor<String> lines = ArgumentCaptor.forClass(String.class);
+            verify(player, atLeast(1)).sendMessage(lines.capture());
+            assertThat(lines.getAllValues()).contains(sentgui);
+            for (String line : lines.getAllValues()) {
+                String plain = org.bukkit.ChatColor.stripColor(line);
+                int dash = plain.indexOf(" - ");
+                if (dash > 0) {
+                    assertThat(plain.substring(dash + 3)).as("line %s", plain)
+                            .doesNotContain(plain.substring(0, dash));
+                }
+            }
+        }
+
+        @Test
         @DisplayName("有管理员权限时应显示管理员命令")
         void shouldShowAdminCommandsForAdmins() {
             when(player.hasPermission("ultimail.admin.sendall")).thenReturn(true);

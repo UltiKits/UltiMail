@@ -105,7 +105,7 @@ class AttachmentSelectorPageTest {
      * Same as {@link #topInventoryClickEvent(int)}, but for a specific {@link ClickType}/
      * {@link InventoryAction} pair -- used to prove that {@link AttachmentSelectorPage#onClick}'s
      * (and the library's toolbar-protection default's) behaviour does not depend on which one was
-     * used to trigger the click, per WR-01.
+     * used to trigger the click.
      */
     private InventoryClickEvent topInventoryClickEvent(int rawSlot, ClickType clickType, InventoryAction action) {
         InventoryView view = player.getOpenInventory();
@@ -122,7 +122,7 @@ class AttachmentSelectorPageTest {
      * still call {@code InventoryView.getTopInventory()} via {@code invokevirtual} (confirmed by
      * {@code javap} against the shaded jar) -- so on Paper 1.21's interface-shaped
      * {@code InventoryView}, that call throws {@link IncompatibleClassChangeError}. This is a
-     * third-party binary incompatibility unrelated to this plan's fix, not caused by it, and not
+     * third-party binary incompatibility unrelated to this fix, not caused by it, and not
      * fixable by editing this module. By the time it is thrown, {@code setCancelled(...)} and this
      * page's own {@code onConfirm}/{@code onCancel} callback have already run (both precede
      * {@code player.closeInventory()} in the icon's click-action lambda), so the assertions this
@@ -356,13 +356,13 @@ class AttachmentSelectorPageTest {
     }
 
     /**
-     * Gate 1 MN-01. {@code onConfirm} used to leave the items it KEPT sitting in their slots and
-     * rely on the {@code confirmed} flag to stop the close handler handing them back a second
-     * time -- so the module's system-level claim that "no path can give the same stack back twice"
-     * because "the content slot is emptied as its item is handed over" was true of
-     * {@link AttachmentSelectorPage#returnAllItems()} and of the excess branch, but not of the
-     * confirm path. Draining every slot it hands over makes the content area the single record of
-     * what the page still owes the player, which is what lets the flag go entirely.
+     * {@code onConfirm} used to leave the items it KEPT sitting in their slots and rely on the
+     * {@code confirmed} flag to stop the close handler handing them back a second time -- so the
+     * module's system-level claim that "no path can give the same stack back twice" because "the
+     * content slot is emptied as its item is handed over" was true of {@link
+     * AttachmentSelectorPage#returnAllItems()} and of the excess branch, but not of the confirm
+     * path. Draining every slot it hands over makes the content area the single record of what
+     * the page still owes the player, which is what lets the flag go entirely.
      */
     @Test
     @DisplayName("确认时应清空它交出的每一个槽位，使二次归还无从发生")
@@ -395,11 +395,11 @@ class AttachmentSelectorPageTest {
     }
 
     /**
-     * Gate 1 MN-02. Draining the slots before the callback runs is what makes a second return
-     * impossible -- and it is also what would turn a throwing callback into item destruction,
-     * since the items are then in neither the page nor the mail. The confirm path therefore hands
-     * the kept items back if the callback did not complete. Without that compensation this test's
-     * items would exist nowhere at all.
+     * Draining the slots before the callback runs is what makes a second return impossible -- and
+     * it is also what would turn a throwing callback into item destruction, since the items are
+     * then in neither the page nor the mail. The confirm path therefore hands the kept items back
+     * if the callback did not complete. Without that compensation this test's items would exist
+     * nowhere at all.
      */
     @Test
     @DisplayName("确认回调抛异常时应把已保留的物品归还，而不是让它们消失")
@@ -429,10 +429,10 @@ class AttachmentSelectorPageTest {
     }
 
     /**
-     * Gate 1 MJ-01. The checklist row for this page asserted that "a shift-click INTO the content
-     * area while it has room is deliberately allowed, not guarded". Measured here: it is cancelled,
-     * and not by anything this module wrote. A shift-click originating in the player's own inventory
-     * has its raw slot in the BOTTOM inventory, so {@link AttachmentSelectorPage#onClick} reports
+     * The checklist row for this page asserted that "a shift-click INTO the content area while it
+     * has room is deliberately allowed, not guarded". Measured here: it is cancelled, and not by
+     * anything this module wrote. A shift-click originating in the player's own inventory has its
+     * raw slot in the BOTTOM inventory, so {@link AttachmentSelectorPage#onClick} reports
      * unhandled ({@code rawSlot >= 0 && rawSlot < CONTENT_SIZE} is false), and the library's
      * {@code InvListener#onClick} then takes its {@code getSlot() != getRawSlot()} branch and
      * cancels {@code MOVE_TO_OTHER_INVENTORY} outright.
@@ -441,7 +441,7 @@ class AttachmentSelectorPageTest {
      * hold, and the click was cancelled anyway -- so this is not a full-page artefact.
      */
     @Test
-    @DisplayName("从玩家背包 shift-click 放入内容区域会被取消（MJ-01：与文档此前的说法相反）")
+    @DisplayName("从玩家背包 shift-click 放入内容区域会被取消（与文档此前的说法相反）")
     void shiftClickPlacementFromThePlayerInventoryIsCancelled() {
         InventoryView view = player.getOpenInventory();
         assertThat(view.getTopInventory().firstEmpty())
@@ -462,7 +462,7 @@ class AttachmentSelectorPageTest {
     }
 
     /**
-     * The other half of MJ-01's note: removal by shift-click DOES work, because the raw slot is
+     * The other half of that correction: removal by shift-click DOES work, because the raw slot is
      * then inside the content area and this page reports the click handled. Kept next to the test
      * above so the asymmetry the documents now state is visible in one place.
      */
@@ -495,10 +495,10 @@ class AttachmentSelectorPageTest {
         // Gui.onDrag(InventoryDragEvent) defaults to `return false`, and AttachmentSelectorPage
         // does not override it (unlike onClick), so InvListener's own default cancellation for an
         // unhandled drag into the top inventory still applies -- a real mouse-drag placement
-        // remains fully blocked, exactly as before this PR's fix. This is the behaviour WR-03
-        // documents: the class javadoc's former "players can drag items into the GUI" claim was
-        // inaccurate, and this test locks in the actual (unfixed) limitation rather than the
-        // aspirational one.
+        // remains fully blocked, exactly as before this PR's fix. This is the behaviour the class
+        // javadoc now documents: the class javadoc's former "players can drag items into the GUI"
+        // claim was inaccurate, and this test locks in the actual (unfixed) limitation rather
+        // than the aspirational one.
         assertThat(event.isCancelled())
                 .as("drag-placement into the content area is not supported and must stay cancelled")
                 .isTrue();
