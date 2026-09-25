@@ -88,6 +88,9 @@ class UltiMailRemovedKeyEndToEndTest {
         doReturn(logger).when(plugin).getLogger();
         // The warnings come from the language file; answered from the real en catalogue.
         doAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en")).when(plugin).i18n(anyString());
+        // The server's language, which the framework reads from its own config.yml; a unit test has no
+        // framework instance, so answer it directly.
+        doReturn("en").when(plugin).getLanguageCode();
         return plugin;
     }
 

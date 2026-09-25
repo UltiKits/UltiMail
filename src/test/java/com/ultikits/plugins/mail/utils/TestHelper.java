@@ -120,8 +120,7 @@ public final class TestHelper {
     }
 
     /**
-     * Binds a configuration entity to {@code plugin}, as the framework does when it loads the file,
-     * so a text setting left blank reads that plugin's language file.
+     * Binds a configuration entity to {@code plugin}, as the framework does when it loads the file.
      */
     @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
     public static void bindPlugin(com.ultikits.ultitools.abstracts.AbstractConfigEntity config,
