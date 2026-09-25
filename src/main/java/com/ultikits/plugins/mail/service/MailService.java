@@ -266,7 +266,10 @@ public class MailService {
     private void notifyReceiver(String receiverName, String senderName) {
         Player receiver = Bukkit.getPlayerExact(receiverName);
         if (receiver != null && receiver.isOnline()) {
-            String message = config.getMailReceivedMessage().replace("{SENDER}", senderName);
+            // A configured message names the sender {SENDER}; the language file's notify_mail_received,
+            // shown while the setting is blank, names it {0}.
+            String message = config.getMailReceivedMessage().replace("{SENDER}", senderName)
+                    .replace("{0}", senderName);
             receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
         }
     }
@@ -340,7 +343,7 @@ public class MailService {
         try {
             dataOperator.update(mail);
         } catch (IllegalAccessException e) {
-            plugin.getLogger().error("Failed to mark mail as read: " + e.getMessage());
+            plugin.getLogger().error(plugin.i18n("log_mark_read_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
         }
     }
     
@@ -383,7 +386,7 @@ public class MailService {
         try {
             dataOperator.update(mail);
         } catch (IllegalAccessException e) {
-            plugin.getLogger().error("Failed to claim items: " + e.getMessage());
+            plugin.getLogger().error(plugin.i18n("log_claim_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
         }
         
         return items;
@@ -423,7 +426,7 @@ public class MailService {
             dataOperator.update(mail);
             
         } catch (Exception e) {
-            plugin.getLogger().error("Failed to execute mail commands: " + e.getMessage());
+            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
         }
     }
     
@@ -445,7 +448,7 @@ public class MailService {
             try {
                 dataOperator.update(mail);
             } catch (IllegalAccessException e) {
-                plugin.getLogger().error("Failed to update mail: " + e.getMessage());
+                plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
             }
         }
     }
@@ -594,7 +597,7 @@ public class MailService {
             
             return Base64Coder.encodeLines(outputStream.toByteArray());
         } catch (Exception e) {
-            plugin.getLogger().warn("Failed to serialize items: " + e.getMessage());
+            plugin.getLogger().warn(plugin.i18n("log_serialize_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
             return null;
         }
     }
@@ -616,7 +619,7 @@ public class MailService {
             
             return items;
         } catch (Exception e) {
-            plugin.getLogger().warn("Failed to deserialize items: " + e.getMessage());
+            plugin.getLogger().warn(plugin.i18n("log_deserialize_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
             return new ItemStack[0];
         }
     }

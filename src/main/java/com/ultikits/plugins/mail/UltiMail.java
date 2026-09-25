@@ -8,6 +8,7 @@ import com.ultikits.ultitools.annotations.UltiToolsModule;
 import com.ultikits.ultitools.context.SimpleContainer;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * UltiMail - In-game mail system for Minecraft servers.
@@ -27,10 +28,11 @@ public class UltiMail extends UltiToolsPlugin {
 
     @Override
     public boolean registerSelf() {
-        getLogger().info(i18n("UltiMail 已启用！"));
+        getLogger().info(i18n("mail_enabled"));
         // Deleting a key from MailConfig does nothing to the operator's existing file, so tell them
         // about any key this version no longer reads (UltiKits/UltiMail#23).
         warnAboutRemovedConfigKeys();
+        blankShippedTextDefaults();
         return true;
     }
 
@@ -43,15 +45,34 @@ public class UltiMail extends UltiToolsPlugin {
     @Override
     protected void onReload() {
         warnAboutRemovedConfigKeys();
+        blankShippedTextDefaults();
+    }
+
+    /**
+     * Blanks every text setting in {@code config/mail.yml} that still holds the default an earlier
+     * version shipped (all were Chinese) and saves the file, so the language file's text takes over in
+     * the server's language; any other value is the operator's and is kept (maintainer ruling
+     * 2026-09-24 (d)). Runs at start-up and on every reload, after the framework has read the file; a
+     * blank value matches no shipped default, so it is never rewritten twice.
+     */
+    private void blankShippedTextDefaults() {
+        MailConfig config = getConfig(MailConfig.class);
+        if (config == null || !config.migrateLegacyDefaults()) {
+            return;
+        }
+        try {
+            config.save();
+        } catch (IOException e) {
+            getLogger().warn(e, i18n("log_config_default_save_failed").replace("{FILE}", MailConfig.CONFIG_FILE));
+        }
     }
 
     private void warnAboutRemovedConfigKeys() {
         // Advisory only: nothing it throws may cost the module its enable or its reload.
         try {
-            RemovedConfigKeys.warnAboutLeftovers(operatorConfigFile(), getLogger()::warn);
+            RemovedConfigKeys.warnAboutLeftovers(operatorConfigFile(), getLogger()::warn, this);
         } catch (RuntimeException e) {
-            getLogger().warn(e, "Could not check " + MailConfig.CONFIG_FILE
-                    + " for removed configuration keys; the module continues without that check.");
+            getLogger().warn(e, i18n("log_removed_key_check_failed").replace("{FILE}", MailConfig.CONFIG_FILE));
         }
     }
 

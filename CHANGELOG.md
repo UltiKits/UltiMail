@@ -7,15 +7,57 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The five text settings in `config/mail.yml` (`messages.mail-received`, `recall.subject`,
+  `recall.content`, `email.recall-subject`, `email.recall-content`) now follow `language` unless you
+  have customised them. Their default is now blank, and a blank value uses the language file's text in
+  the server's language; previously the default was fixed Chinese text, so `language: en` had no
+  effect on the new-mail notice or on recall mails. On upgrade, at start-up and on every
+  `/ul reload`, a value that is exactly the Chinese default an earlier version shipped is replaced
+  with a blank value and the file is saved; any other value is yours and is used as written. The
+  language file's new-mail notice names the sender `{0}`; a configured value keeps using `{SENDER}`.
+  `recall.server-name` is unchanged: it is your server's name.
+- `config/mail.yml` 中的五项文本设置（`messages.mail-received`、`recall.subject`、`recall.content`、
+  `email.recall-subject`、`email.recall-content`）现在除非被你自定义，否则跟随 `language`。它们的默认值现为空，
+  空值会以服务器语言使用语言文件中的文本；此前默认值是写死的中文，所以 `language: en` 对新邮件提醒和召回邮件都不起作用。
+  升级后，在启动时以及每次 `/ul reload` 时，与旧版本出厂中文默认值完全相同的值会被替换为空值并保存文件；其他任何值都视为
+  你的自定义，按原样使用。语言文件里的新邮件提醒用 `{0}` 表示发件人；你配置的值继续使用 `{SENDER}`。`recall.server-name`
+  不变：它是你服务器的名字。
+
 ### Fixed
 
+- `/mail help` now lists `/mail sentgui`, and each help line shows its command once. Every line used
+  to print the command twice, because the language file's help text already starts with it
+  (UltiKits/UltiMail#21).
+- `language: en` now applies to the unread-mail notice another module can send through UltiMail's
+  mail service, which was fixed Chinese text (UltiKits/UltiMail#21), and to everything `/recall`
+  prints — the permission refusal, the progress and summary lines and its help — and to the recall
+  mail and email text (UltiKits/UltiMail#22). The three commands' descriptions (shown by `/help`)
+  follow `language` too.
 - The join notification now shows the real unread count, one pair of brackets around
   `[Click to view]`, and colour where it used to show `&` codes: it read
   `&e[Mail] &fYou have &a{0} &funread mail(s)! [&e[Click to view]]`. Clicking it still opens the
   inbox (UltiKits/UltiMail#24).
+- The enable line on the console now follows `language` (it looked up a Chinese sentence that no
+  language file carried), and under `language: zh` the join notification's hover text comes from the
+  Chinese language file (UltiKits/UltiMail#28). `language: zh` also applies to the console lines that
+  were fixed English text: a failed mail read, claim, command run, update or item conversion, a
+  failed recall email, the missing-UltiLogin line of `/recall`, and the warning about a key this
+  version no longer reads. Their English wording is unchanged, except that the warning for a
+  leftover `messages.new-mail` no longer says the notification leaves the count out.
+- `/mail help` 现在会列出 `/mail sentgui`，而且每行帮助只显示一次命令。此前每行都会把命令打印两遍，因为语言文件里的
+  帮助文本本身已经以命令开头（UltiKits/UltiMail#21）。
+- `language: en` 现在对其他模块可通过 UltiMail 的邮件服务发送的未读邮件提醒生效（原先是写死的中文，UltiKits/UltiMail#21），
+  也对 `/recall` 打印的全部内容生效——权限拒绝、进度与汇总行以及帮助——并对召回邮件和电子邮件的文本生效
+  （UltiKits/UltiMail#22）。三个命令的描述（由 `/help` 显示）也跟随 `language`。
 - 登录时的邮件提醒现在会显示真实的未读数量、`[Click to view]` 只有一对方括号，原先显示 `&` 代码的地方现在显示为颜色：
   此前它显示为 `&e[Mail] &fYou have &a{0} &funread mail(s)! [&e[Click to view]]`。点击它仍会打开收件箱
   （UltiKits/UltiMail#24）。
+- 控制台上的启用日志现在跟随 `language`（它原先查找的是任何语言文件都没有的中文句子），`language: zh` 下登录提醒的
+  悬停文本来自中文语言文件（UltiKits/UltiMail#28）。`language: zh` 也对原先写死为英文的控制台日志生效：读取、领取、
+  执行命令、更新邮件或转换物品失败，召回电子邮件发送失败，`/recall` 找不到 UltiLogin 的提示，以及本版本不再读取的
+  配置键的警告。它们的英文措辞不变，只是残留的 `messages.new-mail` 的警告不再说提醒会漏掉数量。
 
 - Reloading this module (`/ul reload UltiMail`, or `/ul reload` for every module) now re-reads
   `config/mail.yml` and refreshes the language files, so an edited value such as
@@ -82,6 +124,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   只有其中一部分会告知（UltiKits/UltiMail#27）。
 
 ### Removed
+
+- 26 language-file entries that no code displayed, from `lang/en.yml` and `lang/zh.yml`: the
+  `gui_*` page and button words (the pages use UltiTools' own), the `delete_confirm_*` lines (there is
+  no delete confirmation page), the `send_*` lines that other entries replaced (`input_content_prompt`,
+  `mail_sent_success`, `error_no_item_in_hand`), `attachment_gui_title`, `lore_subject`,
+  `lore_items_count`, `error_no_permission`, `sendall_no_permission` (a permission refusal comes from
+  UltiTools' own message), `arg_number` and `arg_content`; and `notify_hover_hint` from
+  `lang/en.yml`, whose text the join notification now reads from `notify_hover_text`.
+- 从 `lang/en.yml` 与 `lang/zh.yml` 中移除 26 条从未被任何代码显示的条目：`gui_*` 翻页与按钮文字（页面使用 UltiTools 自带的）、
+  `delete_confirm_*`（并不存在删除确认页面）、已被其他条目取代的 `send_*`（`input_content_prompt`、`mail_sent_success`、
+  `error_no_item_in_hand`）、`attachment_gui_title`、`lore_subject`、`lore_items_count`、`error_no_permission`、
+  `sendall_no_permission`（权限拒绝消息来自 UltiTools 自身）、`arg_number` 与 `arg_content`；并从 `lang/en.yml` 中移除
+  `notify_hover_hint`，登录提醒的悬停文本现在读取 `notify_hover_text`。
 
 - The module's own console lines on unload and on reload (Chinese sentences meaning "UltiMail
   disabled!" and "UltiMail configuration reloaded!", printed in Chinese under either `language`

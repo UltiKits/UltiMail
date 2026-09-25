@@ -1,6 +1,7 @@
 package com.ultikits.plugins.mail.config;
 
 import com.ultikits.ultitools.abstracts.AbstractConfigEntity;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.ConfigEntity;
 import com.ultikits.ultitools.annotations.ConfigEntry;
 import com.ultikits.ultitools.annotations.config.NotEmpty;
@@ -50,9 +51,11 @@ public class MailConfig extends AbstractConfigEntity {
     @Range(min = 0, max = 300)
     private int sendCooldown = 10;
     
-    @ConfigEntry(path = "messages.mail-received", comment = "收到新邮件")
-    @NotEmpty
-    private String mailReceivedMessage = "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！";
+    // The five text settings below ship blank: a blank value shows the language file's text in the
+    // server's language (the getters at the end of this class). Not @NotEmpty, which would refuse a
+    // blank value (maintainer ruling 2026-09-24 (d)).
+    @ConfigEntry(path = "messages.mail-received", comment = "收到新邮件（{SENDER} 为发件人；留空则使用语言文件中的文本）")
+    private String mailReceivedMessage = "";
     
     // ========== 召回玩家功能配置 ==========
     
@@ -60,13 +63,11 @@ public class MailConfig extends AbstractConfigEntity {
     @NotEmpty
     private String serverName = "Minecraft服务器";
 
-    @ConfigEntry(path = "recall.subject", comment = "游戏内召回邮件标题")
-    @NotEmpty
-    private String recallSubject = "[{SERVER}] 回归召唤";
+    @ConfigEntry(path = "recall.subject", comment = "游戏内召回邮件标题（留空则使用语言文件中的文本）")
+    private String recallSubject = "";
 
-    @ConfigEntry(path = "recall.content", comment = "游戏内召回邮件内容")
-    @NotEmpty
-    private String recallContent = "亲爱的玩家，{SERVER}想念你了！\n\n快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
+    @ConfigEntry(path = "recall.content", comment = "游戏内召回邮件内容（留空则使用语言文件中的文本）")
+    private String recallContent = "";
     
     // ========== 真实邮件发送配置 ==========
     
@@ -97,15 +98,105 @@ public class MailConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "email.smtp-starttls", comment = "是否使用STARTTLS加密")
     private boolean smtpStartTls = true;
     
-    @ConfigEntry(path = "email.recall-subject", comment = "召回电子邮件标题")
-    @NotEmpty
-    private String recallEmailSubject = "[{SERVER}] 我们想念你！";
+    @ConfigEntry(path = "email.recall-subject", comment = "召回电子邮件标题（留空则使用语言文件中的文本）")
+    private String recallEmailSubject = "";
 
-    @ConfigEntry(path = "email.recall-content", comment = "召回电子邮件内容")
-    @NotEmpty
-    private String recallEmailContent = "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
+    @ConfigEntry(path = "email.recall-content", comment = "召回电子邮件内容（留空则使用语言文件中的文本）")
+    private String recallEmailContent = "";
     
     public MailConfig() {
         super(CONFIG_FILE);
+    }
+
+    // The default each text setting had in every earlier version, read from this class's history (one
+    // value per key). They are here only to be recognised in an upgraded operator's file and blanked;
+    // they are never shown.
+    static final String SHIPPED_MAIL_RECEIVED = "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！";
+    static final String SHIPPED_RECALL_SUBJECT = "[{SERVER}] 回归召唤";
+    static final String SHIPPED_RECALL_CONTENT = "亲爱的玩家，{SERVER}想念你了！\n\n快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
+    static final String SHIPPED_RECALL_EMAIL_SUBJECT = "[{SERVER}] 我们想念你！";
+    static final String SHIPPED_RECALL_EMAIL_CONTENT = "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}";
+
+    /**
+     * Blanks every text setting that is exactly the default an earlier version shipped, so the
+     * language file's text takes over in the server's language; any other value is the operator's and
+     * is kept. Idempotent: a blank value matches no shipped default. The caller saves the file when
+     * this returns true (maintainer ruling 2026-09-24 (d)).
+     *
+     * @return whether any value was rewritten
+     */
+    public boolean migrateLegacyDefaults() {
+        boolean changed = false;
+        if (SHIPPED_MAIL_RECEIVED.equals(mailReceivedMessage)) {
+            mailReceivedMessage = "";
+            changed = true;
+        }
+        if (SHIPPED_RECALL_SUBJECT.equals(recallSubject)) {
+            recallSubject = "";
+            changed = true;
+        }
+        if (SHIPPED_RECALL_CONTENT.equals(recallContent)) {
+            recallContent = "";
+            changed = true;
+        }
+        if (SHIPPED_RECALL_EMAIL_SUBJECT.equals(recallEmailSubject)) {
+            recallEmailSubject = "";
+            changed = true;
+        }
+        if (SHIPPED_RECALL_EMAIL_CONTENT.equals(recallEmailContent)) {
+            recallEmailContent = "";
+            changed = true;
+        }
+        return changed;
+    }
+
+    // ---- Text settings: the configured value, or the language file's when it is blank ----
+    // Resolved each time a setting is read, never while the configuration reloads: the framework
+    // reloads configuration before it rebuilds the language, so a value resolved during a reload
+    // would come from the old language (maintainer ruling 2026-09-24 (d)).
+
+    /** {@code configured}, or {@code languageText} when {@code configured} is null, empty or only whitespace. */
+    static String configuredOr(String configured, String languageText) {
+        return configured == null || configured.trim().isEmpty() ? languageText : configured;
+    }
+
+    /**
+     * The language file's text for {@code key}, read through the plugin this configuration was bound
+     * to at load. Before that binding there is no language to read, so the key itself is returned, as
+     * the framework renders a missing key.
+     */
+    private String i18n(String key) {
+        UltiToolsPlugin plugin = getUltiToolsPlugin();
+        return plugin == null ? key : plugin.i18n(key);
+    }
+
+    /**
+     * {@code messages.mail-received}, or the language file's {@code notify_mail_received} when blank.
+     * A configured value names the sender {@code {SENDER}}; the language file's names it {@code {0}}.
+     *
+     * @return the notice a receiver gets when a mail arrives
+     */
+    public String getMailReceivedMessage() {
+        return configuredOr(mailReceivedMessage, i18n("notify_mail_received"));
+    }
+
+    /** @return {@code recall.subject}, or the language file's {@code recall_subject} when blank */
+    public String getRecallSubject() {
+        return configuredOr(recallSubject, i18n("recall_subject"));
+    }
+
+    /** @return {@code recall.content}, or the language file's {@code recall_content} when blank */
+    public String getRecallContent() {
+        return configuredOr(recallContent, i18n("recall_content"));
+    }
+
+    /** @return {@code email.recall-subject}, or the language file's {@code recall_email_subject} when blank */
+    public String getRecallEmailSubject() {
+        return configuredOr(recallEmailSubject, i18n("recall_email_subject"));
+    }
+
+    /** @return {@code email.recall-content}, or the language file's {@code recall_email_content} when blank */
+    public String getRecallEmailContent() {
+        return configuredOr(recallEmailContent, i18n("recall_email_content"));
     }
 }

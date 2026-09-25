@@ -27,7 +27,7 @@ import java.util.Arrays;
 @CmdExecutor(
     alias = {"sendmail", "sm"},
     permission = "ultimail.send",
-    description = "发送邮件"
+    description = "command_description_sendmail"
 )
 public class SendMailCommand extends BaseCommandExecutor {
 
