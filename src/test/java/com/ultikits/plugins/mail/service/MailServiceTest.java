@@ -1784,6 +1784,35 @@ class MailServiceTest {
         }
 
         /**
+         * The server reports an unknown or refused command by returning {@code false} from
+         * {@code performCommand} / {@code dispatchCommand} rather than by throwing. Such a command did
+         * not run and is not retried - the marker is already written - so it gets the same per-command
+         * warning, naming the mail and the command, and the commands after it still run.
+         */
+        @Test
+        @DisplayName("a command the server does not run (false result) is logged at WARNING naming the mail and the command")
+        void aCommandTheServerDoesNotRunIsLogged() throws Exception {
+            doReturn(false).when(receiver).performCommand("nosuch ReceiverPlayer");
+            mockedBukkit.when(() -> Bukkit.dispatchCommand(any(), eq("nosuchconsole ReceiverPlayer"))).thenReturn(false);
+            UltiToolsPlugin injected = injectedPlugin();
+            when(injected.i18n("log_mail_command_rejected"))
+                    .thenReturn(com.ultikits.plugins.mail.i18n.CatalogueText.text("en", "log_mail_command_rejected"));
+            MailData mail = mailWithCommands(
+                    "[\"nosuch %player%\",\"console:nosuchconsole %player%\",\"give %player% diamond 1\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).containsExactly("give ReceiverPlayer diamond 1");
+            assertThat(mail.isCommandsExecuted()).isTrue();
+            ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
+            verify(serviceLogger(), atLeastOnce()).warn(warning.capture());
+            assertThat(warning.getAllValues()).anyMatch(line -> line.contains("mail-7")
+                    && line.contains("nosuch ReceiverPlayer") && !line.contains("{"));
+            assertThat(warning.getAllValues()).anyMatch(line -> line.contains("mail-7")
+                    && line.contains("nosuchconsole ReceiverPlayer") && !line.contains("{"));
+        }
+
+        /**
          * A null entry in a command list supplied through the API threw outside the per-command
          * guard after the marker was written, so the valid commands after it never ran.
          */
