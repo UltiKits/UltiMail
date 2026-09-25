@@ -1,11 +1,15 @@
 package com.ultikits.plugins.mail.gui;
 
+import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.service.MailService;
 import com.ultikits.plugins.mail.utils.MockBukkitHelper;
 import com.ultikits.plugins.mail.utils.TestHelper;
 import com.ultikits.ultitools.UltiTools;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+import com.ultikits.ultitools.exceptions.DataAccessException;
+import com.ultikits.ultitools.interfaces.DataOperator;
+import com.ultikits.ultitools.interfaces.Query;
 
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -26,10 +30,9 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -151,35 +154,61 @@ class MailboxGUIClaimTest {
     }
 
     /**
-     * After a refused marker write the reader is told nothing ran and to read the mail again - which
-     * has to be true in the GUI as well: the mail is already marked read by then, so the commands
-     * must be retried whenever their executed flag is unset, not only on the first, unread click.
+     * gate-1 WR-02. After a refused marker write the reader is told nothing ran and to read the mail
+     * again - which has to be true in the GUI as well. So this drives a real {@link MailService} over a
+     * storage stub and a player that records the commands it runs, and reads the commands that ran
+     * and the mail's own flag: the first click's marker write fails, the second succeeds, a third
+     * click must not run anything again.
      */
     @Test
-    @DisplayName("a read mail whose commands are not marked executed has them retried on the next click")
-    void unexecutedCommandsAreRetriedOnARereadMail() throws Exception {
+    @DisplayName("a refused marker write is retried on the next click, and the commands run exactly once")
+    @SuppressWarnings("unchecked")
+    void refusedCommandsRunExactlyOnceAcrossClicks() throws Exception {
+        List<String> ran = new ArrayList<>();
+        PlayerMock reader = new PlayerMock(server, "commandreader") {
+            @Override
+            public boolean performCommand(String command) {
+                ran.add(command);
+                return true;
+            }
+        };
+        server.addPlayer(reader);
+        UltiToolsPlugin plugin = TestHelper.mockUltiToolsPlugin();
+        DataOperator<MailData> operator = mock(DataOperator.class);
+        Query<MailData> query = mock(Query.class);
+        when(query.where(anyString())).thenReturn(query);
+        when(query.eq(any())).thenReturn(query);
+        when(query.list()).thenReturn(new ArrayList<>());
+        when(operator.query()).thenReturn(query);
+        boolean[] markerWritesFail = {true};
+        doAnswer(inv -> {
+            if (markerWritesFail[0] && ((MailData) inv.getArgument(0)).isCommandsExecuted()) {
+                throw new DataAccessException("connection lost");
+            }
+            return null;
+        }).when(operator).update(any(MailData.class));
+        when(plugin.getDataOperator(any())).thenReturn((DataOperator) operator);
+        MailService service = new MailService();
+        TestHelper.injectField(service, "plugin", plugin);
+        TestHelper.injectField(service, "config", new MailConfig());
+        service.init();
+        MailboxGUI page = new MailboxGUI(reader, service, plugin);
+        injectInventory(page);
+        Method handler = MailboxGUI.class.getDeclaredMethod("handleMailClick", MailData.class);
+        handler.setAccessible(true); // NOPMD - the click handler is private; a click reaches it the same way
         MailData mail = new MailData();
         mail.setId("mail-10");
-        mail.setRead(true);
+        mail.setRead(false);
         mail.setCommands("[\"give %player% diamond 1\"]");
-        mail.setCommandsExecuted(false);
 
-        click(mail);
+        handler.invoke(page, mail);
+        assertThat(ran).isEmpty();
+        assertThat(mail.isCommandsExecuted()).isFalse();
+        markerWritesFail[0] = false;
+        handler.invoke(page, mail);
+        handler.invoke(page, mail);
 
-        verify(mailService).executeMailCommands(player, mail);
-    }
-
-    @Test
-    @DisplayName("control: commands already marked executed are not run again")
-    void executedCommandsAreNotRunAgain() throws Exception {
-        MailData mail = new MailData();
-        mail.setId("mail-11");
-        mail.setRead(true);
-        mail.setCommands("[\"give %player% diamond 1\"]");
-        mail.setCommandsExecuted(true);
-
-        click(mail);
-
-        verify(mailService, never()).executeMailCommands(any(), any());
+        assertThat(ran).containsExactly("give commandreader diamond 1");
+        assertThat(mail.isCommandsExecuted()).isTrue();
     }
 }

@@ -1771,6 +1771,59 @@ class MailServiceTest {
             verify(serviceLogger(), atLeastOnce()).warn(warning.capture());
             assertThat(warning.getAllValues()).anyMatch(line -> line.contains("[log_mail_command_failed]"));
         }
+
+        /**
+         * gate-1 IN-01: the warning names the mail and the command, from the real English text, and a
+         * command whose own text contains a placeholder token is logged as written, not expanded again.
+         */
+        @Test
+        @DisplayName("the failed-command warning names the mail and the command, filled in one pass")
+        void theFailedCommandWarningNamesTheMailAndTheCommand() throws Exception {
+            UltiToolsPlugin injected = injectedPlugin();
+            when(injected.i18n("log_mail_command_failed"))
+                    .thenReturn(com.ultikits.plugins.mail.i18n.CatalogueText.text("en", "log_mail_command_failed"));
+            MailData mail = mailWithCommands("[\"boom {ERROR} {MAIL}\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+
+            ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
+            verify(serviceLogger(), atLeastOnce()).warn(warning.capture());
+            assertThat(warning.getAllValues()).anyMatch(line -> line.contains("mail-7")
+                    && line.contains("boom {ERROR} {MAIL}") && line.contains("executor failed"));
+        }
+
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        private UltiToolsPlugin injectedPlugin() throws Exception {
+            Field field = MailService.class.getDeclaredField("plugin");
+            field.setAccessible(true);
+            return (UltiToolsPlugin) field.get(mailService);
+        }
+    }
+
+    /**
+     * gate-1 WR-03: marking a mail read runs right before both hand-overs. A database error there must
+     * not escape - or the refusal replies of the hand-overs never appear in the very outage they are
+     * for. A read flag is not a one-time hand-over, so a failed write is logged and the read continues.
+     */
+    @Nested
+    @DisplayName("markAsRead storage failure")
+    class MarkAsReadStorageFailureTests {
+
+        @Test
+        @DisplayName("an unchecked database error while marking read is logged, not thrown")
+        void markAsReadSurvivesADatabaseError() throws Exception {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(mail);
+
+            mailService.markAsRead(mail);
+
+            assertThat(mail.isRead()).isTrue();
+            Field field = MailService.class.getDeclaredField("plugin");
+            field.setAccessible(true); // NOPMD - reads the plugin actually injected into the service
+            ArgumentCaptor<String> error = ArgumentCaptor.forClass(String.class);
+            verify(((UltiToolsPlugin) field.get(mailService)).getLogger(), atLeastOnce()).error(error.capture());
+            assertThat(error.getAllValues()).anyMatch(line -> line.contains("[log_mark_read_failed]"));
+        }
     }
 
     // ==================== claimItems edge cases ====================

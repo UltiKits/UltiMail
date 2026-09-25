@@ -491,6 +491,28 @@ class MailCommandTest {
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[claim_success]")));
         }
 
+        /** gate-1 IN-02: an attachment that cannot be read has nothing to hand over, and says so. */
+        @Test
+        @DisplayName("an attachment that cannot be read is answered as having no attachments, not as a success")
+        void shouldReportAnUnreadableAttachmentAsNoItems() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mail.setItems("base64data");
+            mail.setClaimed(false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.getItemCount(mail)).thenReturn(0);
+            when(playerInventory.getStorageContents()).thenReturn(new ItemStack[]{null});
+            when(mockMailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.nothingToClaim());
+
+            mailCommand.claim(player, 1);
+
+            ArgumentCaptor<String> told = ArgumentCaptor.forClass(String.class);
+            verify(player, atLeastOnce()).sendMessage(told.capture());
+            assertThat(told.getAllValues()).anyMatch(m -> m.contains("[claim_no_items]"));
+            assertThat(told.getAllValues()).noneMatch(m -> m.contains("[claim_success]"));
+        }
+
         /**
          * A claim the service refused because its claimed flag could not be written is not a success:
          * nothing was given, and the player is told to try again (UltiKits/UltiMail#31).
