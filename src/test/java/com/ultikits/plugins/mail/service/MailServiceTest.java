@@ -1788,8 +1788,8 @@ class MailServiceTest {
         }
 
         /**
-         * gate-1 IN-01: the warning names the mail and the command, from the real English text, and a
-         * command whose own text contains a placeholder token is logged as written, not expanded again.
+         * The warning names the mail and the command, from the real English text, and a command whose
+         * own text contains a placeholder token is logged as written, not expanded again.
          */
         @Test
         @DisplayName("the failed-command warning names the mail and the command, filled in one pass")
@@ -1816,9 +1816,9 @@ class MailServiceTest {
     }
 
     /**
-     * gate-1 WR-03: marking a mail read runs right before both hand-overs. A database error there must
-     * not escape - or the refusal replies of the hand-overs never appear in the very outage they are
-     * for. A read flag is not a one-time hand-over, so a failed write is logged and the read continues.
+     * Marking a mail read runs right before both hand-overs. A database error there must not escape -
+     * or the refusal replies of the hand-overs never appear in the very outage they are for. A read
+     * flag is not a one-time hand-over, so a failed write is logged and the read continues.
      */
     @Nested
     @DisplayName("markAsRead storage failure")

@@ -491,7 +491,7 @@ class MailCommandTest {
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[claim_success]")));
         }
 
-        /** gate-1 IN-02: an attachment that cannot be read has nothing to hand over, and says so. */
+        /** An attachment that cannot be read has nothing to hand over, and says so. */
         @Test
         @DisplayName("an attachment that cannot be read is answered as having no attachments, not as a success")
         void shouldReportAnUnreadableAttachmentAsNoItems() {

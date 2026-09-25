@@ -154,11 +154,11 @@ class MailboxGUIClaimTest {
     }
 
     /**
-     * gate-1 WR-02. After a refused marker write the reader is told nothing ran and to read the mail
-     * again - which has to be true in the GUI as well. So this drives a real {@link MailService} over a
-     * storage stub and a player that records the commands it runs, and reads the commands that ran
-     * and the mail's own flag: the first click's marker write fails, the second succeeds, a third
-     * click must not run anything again.
+     * After a refused marker write the reader is told nothing ran and to read the mail again - which
+     * has to be true in the GUI as well. So this drives a real {@link MailService} over a storage
+     * stub and a player that records the commands it runs, and reads the commands that ran and the
+     * mail's own flag: the first click's marker write fails, the second succeeds, a third click must
+     * not run anything again.
      */
     @Test
     @DisplayName("a refused marker write is retried on the next click, and the commands run exactly once")
