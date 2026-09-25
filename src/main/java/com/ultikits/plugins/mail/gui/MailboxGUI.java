@@ -120,11 +120,13 @@ public class MailboxGUI extends BasePaginationPage {
         // Mark as read
         if (!mail.isRead()) {
             mailService.markAsRead(mail);
-            
-            // Execute commands if any (only once)
-            if (mail.hasCommands() && !mail.isCommandsExecuted()) {
-                mailService.executeMailCommands(player, mail);
-            }
+        }
+
+        // Execute commands if any (only once). Decided by the executed flag rather than by the first,
+        // unread click: when the executed marker could not be written, no command ran and the reader
+        // was told to read the mail again - which has to retry here too (UltiKits/UltiMail#31).
+        if (mail.hasCommands() && !mail.isCommandsExecuted()) {
+            mailService.executeMailCommands(player, mail);
         }
         
         // Try to claim items if has unclaimed items
@@ -137,10 +139,13 @@ public class MailboxGUI extends BasePaginationPage {
                 player.sendMessage(ChatColor.RED + i18n("claim_inventory_full")
                     .replace("{0}", String.valueOf(requiredSlots)));
             } else {
-                ItemStack[] items = mailService.claimItems(mail, player);
-                if (items.length > 0) {
+                MailService.ClaimResult result = mailService.claimAttachment(mail, player);
+                if (result.getStatus() == MailService.ClaimResult.Status.CLAIMED) {
                     player.sendMessage(ChatColor.GREEN + i18n("claim_success")
-                        .replace("{0}", String.valueOf(items.length)));
+                        .replace("{0}", String.valueOf(result.getItems().length)));
+                } else if (result.getStatus() == MailService.ClaimResult.Status.NOT_RECORDED) {
+                    // Nothing was handed over; the mail stays claimable (UltiKits/UltiMail#31).
+                    player.sendMessage(ChatColor.RED + i18n("claim_not_recorded"));
                 }
             }
         }
