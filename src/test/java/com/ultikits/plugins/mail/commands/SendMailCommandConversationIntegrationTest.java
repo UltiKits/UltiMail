@@ -36,17 +36,16 @@ import static org.mockito.Mockito.when;
 
 /**
  * Integration test driving {@link SendMailCommand} through a real MockBukkit
- * {@link org.bukkit.conversations.Conversation}, added for the phase 13 review's WR-02: every
- * other test touching {@code ContentPrompt.acceptInput} (see {@link SendMailCommandTest} and
- * {@code MailServiceTest}) uses a pure Mockito {@code Player} whose {@code beginConversation(...)}
- * is itself an unstubbed mock -- the {@code Conversation} object is captured and inspected, or
- * {@code acceptInput} is invoked directly via reflection, but the real Bukkit conversation
- * lifecycle (prompt output, local echo, modal-conversation gating) never actually runs. Those
- * tests prove "the correct API was called"; this one proves "the message a real client would see
- * actually arrives."
+ * {@link org.bukkit.conversations.Conversation}, added because every other test touching {@code
+ * ContentPrompt.acceptInput} (see {@link SendMailCommandTest} and {@code MailServiceTest}) uses a
+ * pure Mockito {@code Player} whose {@code beginConversation(...)} is itself an unstubbed mock --
+ * the {@code Conversation} object is captured and inspected, or {@code acceptInput} is invoked
+ * directly via reflection, but the real Bukkit conversation lifecycle (prompt output, local echo,
+ * modal-conversation gating) never actually runs. Those tests prove "the correct API was called";
+ * this one proves "the message a real client would see actually arrives."
  * <p>
- * {@link PlayerMock#sendMessage(String)} is disassembled-confirmed (see the phase 13 review) to be
- * an unconditional no-op while {@code ConversationTracker.isConversingModaly()} is {@code true};
+ * {@link PlayerMock#sendMessage(String)} is disassembled-confirmed to be an unconditional no-op
+ * while {@code ConversationTracker.isConversingModaly()} is {@code true};
  * {@link PlayerMock#sendRawMessage(String)} bypasses that check unconditionally. Because
  * {@code ConversationTracker.acceptConversationInput(...)} only removes a finished conversation
  * from its queue *after* {@code Conversation.acceptInput(...)} returns, the player is still
@@ -349,7 +348,7 @@ class SendMailCommandConversationIntegrationTest {
         }
 
         @Test
-        @DisplayName("输入首字母大写 Cancel 结束对话：附件归还（BL-01 的具体故障）")
+        @DisplayName("输入首字母大写 Cancel 结束对话：附件归还（UltiKits/UltiMail#27 的具体故障）")
         void theCancelWordCapitalisedGivesTheAttachmentBack() {
             startSingleAttachmentSendWithRoomToSpare();
 

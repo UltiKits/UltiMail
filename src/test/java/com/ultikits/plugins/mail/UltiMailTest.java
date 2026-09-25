@@ -94,11 +94,11 @@ class UltiMailTest {
         }
 
         /**
-         * Gate 1 MJ-02's hook point. {@code unregisterSelf()} is {@code final} in UltiTools 6.3.0
-         * and always runs the framework's own command and listener unregistration, so a module
-         * with unload work of its own overrides {@code onUnregister()} -- which that template
-         * method calls BEFORE the framework tears the module's listeners down, so the module's own
-         * beans are still alive while it runs.
+         * The unload hook point. {@code unregisterSelf()} is {@code final} in UltiTools 6.3.0 and
+         * always runs the framework's own command and listener unregistration, so a module with
+         * unload work of its own overrides {@code onUnregister()} -- which that template method
+         * calls BEFORE the framework tears the module's listeners down, so the module's own beans
+         * are still alive while it runs.
          */
         @Test
         @DisplayName("UltiMail declares the unload hook, not the final template method")

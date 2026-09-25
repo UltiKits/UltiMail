@@ -14,20 +14,20 @@ for real-machine verification, not user-facing documentation.
 - **Columns:** `ID`, `Preconditions`, `Steps`, `Expected`, `Layer`, `Covers`.
 - **ID:** cites its `FEATURES.md` ID verbatim. A negative case suffixes the checklist ID only,
   as `.neg-<slug>` — a negative case still tests the same feature, so the base ID is unchanged.
-- **Layer**, copied verbatim from Laojun's own `ultitools-real-client-uat` skill so no
+- **Layer**, copied verbatim from the real-client acceptance tooling's fixed vocabulary so no
   translation step exists at dispatch time: `protocol`, `java-client`, `os-input`, `pixel`,
   `server`, `human`.
 - This module has no row needing personal credentials or a maintainer-authenticated UltiCloud
-  panel session — the D-27b pattern (stated here for template consistency) does not currently
+  panel session — the human-authenticated-session pattern (stated here for template consistency) does not currently
   apply to any row below.
 - **Expected** must name an observable truth — an exact chat line, a log line, a database row,
   an inventory slot — and never the words "it works".
-- **Covers** back-references a Phase 9 GUI-excluded class name; left blank when no such class
+- **Covers** back-references a GUI class excluded from the JaCoCo coverage gate; left blank when no such class
   applies.
 - A row whose Preconditions name a prior row must appear after that row in file order — asserted
   mechanically: for every row, every checklist ID cited in its Preconditions cell must have a
-  strictly smaller line number in this file than the row citing it (sweep class 8, D-27a).
-- **Config-per-file rule (D-06):** one checklist row per `@ConfigEntity`-annotated class, never
+  strictly smaller line number in this file than the row citing it.
+- **Config-per-file rule:** one checklist row per `@ConfigEntity`-annotated class, never
   one row per key. The row's ID is suffixed `-yml` (`ultimail.config.mail-yml`), aggregating
   every per-key `ultimail.config.mail.*` row rather than citing a single one of them.
 - **One message source:** every line this module shows or logs comes from its language files
@@ -156,7 +156,7 @@ key in `plugins/UltiTools/config.yml` that this module's own `lang/en.yml` strin
 
 ## Configuration
 
-One row per shipped yml file (D-06's config-per-file rule): `mail.yml` (20 keys). The row
+One row per shipped yml file (the config-per-file rule): `mail.yml` (20 keys). The row
 confirms every key is present at its `FEATURES.md`-documented default, then flips one or more
 representative keys and observes the behaviour follow. The three keys that never had an effect
 (`mail-expire-days`, `messages.new-mail`, `messages.mail-sent`) were removed by

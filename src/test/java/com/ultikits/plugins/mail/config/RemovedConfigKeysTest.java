@@ -155,11 +155,11 @@ class RemovedConfigKeysTest {
     }
 
     /**
-     * Gate 1 IN-02. The removed keys used {@code {COUNT}} and {@code {PLAYER}}; the catalogue entries
-     * they point to use {@code {0}} and {@code {RECEIVER}}. An operator who pastes their old text
-     * into the catalogue as told would have it refused by the framework's placeholder check and
-     * replaced with the bundled text, so each message warning names the placeholder to use and the
-     * one it replaces.
+     * The removed keys used {@code {COUNT}} and {@code {PLAYER}}; the catalogue entries they point
+     * to use {@code {0}} and {@code {RECEIVER}}. An operator who pastes their old text into the
+     * catalogue as told would have it refused by the framework's placeholder check and replaced
+     * with the bundled text, so each message warning names the placeholder to use and the one it
+     * replaces.
      * <p>
      * Codex P2 on #35: the join notification does not yet substitute {@code {0}} (it replaces
      * {@code {COUNT}}, UltiKits/UltiMail#24), so the new-mail warning must not claim that {@code {0}}

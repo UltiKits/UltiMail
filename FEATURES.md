@@ -172,8 +172,7 @@ module's own commands.
 
 ## GUI
 
-Phase 9 excluded all three classes below from this module's JaCoCo `check` gate
-(`.planning/phases/09-module-ecosystem-readiness-and-test-coverage/gui-exclusions/UltiMail.md`).
+All three classes below are excluded from this module's JaCoCo `check` gate.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
