@@ -132,17 +132,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
-- 26 language-file entries that no code displayed, from `lang/en.yml` and `lang/zh.yml`: the
+- 27 language-file entries that no code displayed, from `lang/en.yml` and `lang/zh.yml`: the
   `gui_*` page and button words (the pages use UltiTools' own), the `delete_confirm_*` lines (there is
   no delete confirmation page), the `send_*` lines that other entries replaced (`input_content_prompt`,
   `mail_sent_success`, `error_no_item_in_hand`), `attachment_gui_title`, `lore_subject`,
   `lore_items_count`, `error_no_permission`, `sendall_no_permission` (a permission refusal comes from
-  UltiTools' own message), `arg_number` and `arg_content`; and `notify_hover_hint` from
-  `lang/en.yml`, whose text the join notification now reads from `notify_hover_text`.
-- 从 `lang/en.yml` 与 `lang/zh.yml` 中移除 26 条从未被任何代码显示的条目：`gui_*` 翻页与按钮文字（页面使用 UltiTools 自带的）、
+  UltiTools' own message), `arg_number`, `arg_content` and `notify_mail_received` (the new-mail notice
+  is `messages.mail-received` in `config/mail.yml`, whose built-in text is `mail_received`); and
+  `notify_hover_hint` from `lang/en.yml`, whose text the join notification now reads from `notify_hover_text`.
+- 从 `lang/en.yml` 与 `lang/zh.yml` 中移除 27 条从未被任何代码显示的条目：`gui_*` 翻页与按钮文字（页面使用 UltiTools 自带的）、
   `delete_confirm_*`（并不存在删除确认页面）、已被其他条目取代的 `send_*`（`input_content_prompt`、`mail_sent_success`、
   `error_no_item_in_hand`）、`attachment_gui_title`、`lore_subject`、`lore_items_count`、`error_no_permission`、
-  `sendall_no_permission`（权限拒绝消息来自 UltiTools 自身）、`arg_number` 与 `arg_content`；并从 `lang/en.yml` 中移除
+  `sendall_no_permission`（权限拒绝消息来自 UltiTools 自身）、`arg_number`、`arg_content` 与 `notify_mail_received`
+  （新邮件提醒是 `config/mail.yml` 中的 `messages.mail-received`，其内置文本为 `mail_received`）；并从 `lang/en.yml` 中移除
   `notify_hover_hint`，登录提醒的悬停文本现在读取 `notify_hover_text`。
 
 - The module's own console lines on unload and on reload (Chinese sentences meaning "UltiMail
