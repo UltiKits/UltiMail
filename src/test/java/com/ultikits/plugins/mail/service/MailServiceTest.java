@@ -1684,6 +1684,14 @@ class MailServiceTest {
             });
         }
 
+        /** The logger of the plugin injected into the service (setUp creates more than one mock plugin). */
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        private com.ultikits.ultitools.interfaces.impl.logger.PluginLogger serviceLogger() throws Exception {
+            Field field = MailService.class.getDeclaredField("plugin");
+            field.setAccessible(true);
+            return ((UltiToolsPlugin) field.get(mailService)).getLogger();
+        }
+
         private MailData mailWithCommands(String json) {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setId("mail-7");
@@ -1760,7 +1768,7 @@ class MailServiceTest {
             assertThat(ran).containsExactly("give ReceiverPlayer diamond 1");
             assertThat(mail.isCommandsExecuted()).isTrue();
             ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
-            verify(TestHelper.getMockPlugin().getLogger(), atLeastOnce()).warn(warning.capture());
+            verify(serviceLogger(), atLeastOnce()).warn(warning.capture());
             assertThat(warning.getAllValues()).anyMatch(line -> line.contains("[log_mail_command_failed]"));
         }
     }

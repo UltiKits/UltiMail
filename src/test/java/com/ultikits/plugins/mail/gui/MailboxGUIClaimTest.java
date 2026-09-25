@@ -4,6 +4,7 @@ import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.service.MailService;
 import com.ultikits.plugins.mail.utils.MockBukkitHelper;
 import com.ultikits.plugins.mail.utils.TestHelper;
+import com.ultikits.ultitools.UltiTools;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 
 import org.bukkit.Material;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
+import org.mockito.MockedStatic;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -23,7 +25,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,19 +48,52 @@ class MailboxGUIClaimTest {
     private PlayerMock player;
     private MailService mailService;
     private MailboxGUI gui;
+    /** The page refresh after a click builds its navigation buttons through the framework instance. */
+    private MockedStatic<UltiTools> framework;
 
     @BeforeEach
     void setUp() {
         server = MockBukkitHelper.bootstrapServer();
+        UltiTools ultiTools = mock(UltiTools.class);
+        when(ultiTools.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        framework = mockStatic(UltiTools.class);
+        framework.when(UltiTools::getInstance).thenReturn(ultiTools);
         UltiToolsPlugin plugin = TestHelper.mockUltiToolsPlugin();
         player = server.addPlayer("reader");
         mailService = mock(MailService.class);
         when(mailService.getInbox(any())).thenReturn(new ArrayList<>());
         gui = new MailboxGUI(player, mailService, plugin);
+        injectInventory(gui);
+    }
+
+    /**
+     * The page is never opened here, so obliviate's {@code Gui} has no inventory yet; the refresh at
+     * the end of a click writes its navigation row into one. A mock inventory of the page's size is
+     * enough - these tests read what the player was told, not the rendered page.
+     */
+    @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+    private static void injectInventory(Object page) {
+        org.bukkit.inventory.Inventory inventory = mock(org.bukkit.inventory.Inventory.class);
+        when(inventory.getSize()).thenReturn(54);
+        Class<?> type = page.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField("inventory");
+                field.setAccessible(true);
+                field.set(page, inventory);
+                return;
+            } catch (NoSuchFieldException e) {
+                type = type.getSuperclass();
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        throw new IllegalStateException("no inventory field on " + page.getClass());
     }
 
     @AfterEach
     void tearDown() {
+        framework.close();
         TestHelper.cleanupMocks();
         MockBukkitHelper.safeUnmock();
     }
