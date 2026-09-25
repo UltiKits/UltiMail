@@ -77,6 +77,14 @@ class UltiMailLanguageCatalogueTest {
             //                 + "everything else to backup.reason.unknown",
             //         "backup.reason.manual", "backup.reason.auto", "backup.reason.death",
             //         "backup.reason.quit", "backup.reason.admin", "backup.reason.unknown")
+            new DynamicSite("src/main/java/com/ultikits/plugins/mail/UltiMail.java",
+                    "::getLocalizedText",
+                    "UltiMail#writeConfigTextInServerLanguage passes the jar catalogue's getLocalizedText "
+                            + "(ConfigTextDefaults#jarLanguage) to MailConfig#materializeText, which asks it for exactly the "
+                            + "catalogue key of the six text settings of config/mail.yml (maintainer decision 2026-09-25: "
+                            + "config text written in the server's language, from the module jar's own catalogue)",
+                    "mail_received", "recall_server_name", "recall_subject", "recall_content",
+                    "recall_email_subject", "recall_email_content")
     ));
 
     private static List<SourceFile> sources;
