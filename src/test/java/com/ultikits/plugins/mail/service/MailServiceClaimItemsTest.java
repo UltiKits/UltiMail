@@ -6,6 +6,7 @@ import com.ultikits.plugins.mail.utils.MockBukkitHelper;
 import com.ultikits.plugins.mail.utils.TestHelper;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.interfaces.DataOperator;
+import com.ultikits.ultitools.exceptions.DataAccessException;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Item;
@@ -19,6 +20,8 @@ import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -26,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Hand-over tests for {@link MailService#claimItems}, gate 1 MN-03.
@@ -51,6 +56,7 @@ class MailServiceClaimItemsTest {
     private ServerMock server;
     private PlayerMock receiver;
     private MailService mailService;
+    private DataOperator<MailData> dataOperator;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -61,7 +67,8 @@ class MailServiceClaimItemsTest {
 
         UltiToolsPlugin plugin = TestHelper.mockUltiToolsPlugin();
         @SuppressWarnings("unchecked")
-        DataOperator<MailData> dataOperator = mock(DataOperator.class);
+        DataOperator<MailData> operator = mock(DataOperator.class);
+        dataOperator = operator;
         lenient().when(plugin.getDataOperator(any())).thenReturn((DataOperator) dataOperator);
 
         mailService = new MailService();
@@ -135,7 +142,7 @@ class MailServiceClaimItemsTest {
                 .as("the claimer must not already hold the item under test")
                 .isZero();
 
-        ItemStack[] claimed = mailService.claimItems(mail, receiver);
+        ItemStack[] claimed = mailService.claimItems(mail, receiver).getItems();
 
         assertThat(claimed).hasSize(1);
         assertThat(countInInventory(Material.DIAMOND))
@@ -176,7 +183,7 @@ class MailServiceClaimItemsTest {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 1), null,
                 new ItemStack(Material.GOLD_INGOT, 1));
 
-        ItemStack[] claimed = mailService.claimItems(mail, receiver);
+        ItemStack[] claimed = mailService.claimItems(mail, receiver).getItems();
 
         assertThat(claimed)
                 .as("claimItems still reports what the mail stored, nulls included -- callers such "
@@ -187,5 +194,80 @@ class MailServiceClaimItemsTest {
         assertThat(countDropped(Material.DIAMOND) + countDropped(Material.GOLD_INGOT))
                 .as("both real items fitted, so neither should have been dropped")
                 .isZero();
+    }
+
+    // ==================== record before hand-over (UltiKits/UltiMail#31) ====================
+
+    /**
+     * The maintainer's answer of 2026-09-24 for a one-time claim whose record cannot be written:
+     * write the record first, hand over only after it was written, and refuse the claim when it
+     * fails. Before, the attachment was handed over first and a failed write was only logged, and
+     * because the inbox is re-read from storage on every command the attachment could be claimed
+     * again at once (UltiKits/UltiMail#31). Asserted on the real inventory, the dropped items and
+     * the mail's own flag.
+     */
+    @Test
+    @DisplayName("the claimed flag cannot be written (unchecked database error): nothing is given and the mail stays claimable")
+    void aFailedClaimedWriteGivesNothing() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        doThrow(new DataAccessException("connection lost")).when(dataOperator).update(any(MailData.class));
+
+        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+
+        assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
+        assertThat(result.getItems()).isEmpty();
+        assertThat(countInInventory(Material.DIAMOND)).isZero();
+        assertThat(countDropped(Material.DIAMOND)).isZero();
+        assertThat(mail.isClaimed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("the claimed flag cannot be written (IllegalAccessException): nothing is given and the mail stays claimable")
+    void aCheckedFailureOfTheClaimedWriteGivesNothing() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        doThrow(new IllegalAccessException("field not accessible")).when(dataOperator).update(any(MailData.class));
+
+        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+
+        assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
+        assertThat(countInInventory(Material.DIAMOND)).isZero();
+        assertThat(mail.isClaimed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("the claimed flag is written before the attachment is handed over")
+    void theClaimedFlagIsWrittenBeforeTheHandOver() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        List<Integer> diamondsAtWrite = new ArrayList<>();
+        List<Boolean> claimedAtWrite = new ArrayList<>();
+        doAnswer(inv -> {
+            diamondsAtWrite.add(countInInventory(Material.DIAMOND));
+            claimedAtWrite.add(((MailData) inv.getArgument(0)).isClaimed());
+            return null;
+        }).when(dataOperator).update(any(MailData.class));
+
+        MailService.ClaimResult result = mailService.claimItems(mail, receiver);
+
+        assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.CLAIMED);
+        assertThat(diamondsAtWrite).containsExactly(0);
+        assertThat(claimedAtWrite).containsExactly(true);
+        assertThat(countInInventory(Material.DIAMOND)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("across a failed write the attachment is handed over exactly once")
+    void theAttachmentIsHandedOverExactlyOnce() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        doThrow(new DataAccessException("connection lost")).doNothing()
+                .when(dataOperator).update(any(MailData.class));
+
+        assertThat(mailService.claimItems(mail, receiver).getStatus())
+                .isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
+        assertThat(mailService.claimItems(mail, receiver).getStatus())
+                .isEqualTo(MailService.ClaimResult.Status.CLAIMED);
+        assertThat(mailService.claimItems(mail, receiver).getStatus())
+                .isEqualTo(MailService.ClaimResult.Status.NOTHING_TO_CLAIM);
+
+        assertThat(countInInventory(Material.DIAMOND) + countDropped(Material.DIAMOND)).isEqualTo(2);
     }
 }

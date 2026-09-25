@@ -5,6 +5,7 @@ import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.utils.TestHelper;
 import com.ultikits.ultitools.UltiTools;
+import com.ultikits.ultitools.exceptions.DataAccessException;
 import com.ultikits.ultitools.interfaces.DataOperator;
 import com.ultikits.ultitools.interfaces.Query;
 
@@ -703,7 +704,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setClaimed(true);
 
-            ItemStack[] result = mailService.claimItems(mail, receiver);
+            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -714,7 +715,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems(null);
 
-            ItemStack[] result = mailService.claimItems(mail, receiver);
+            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -725,7 +726,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems("");
 
-            ItemStack[] result = mailService.claimItems(mail, receiver);
+            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
 
             assertThat(result).isEmpty();
         }
@@ -1650,6 +1651,120 @@ class MailServiceTest {
         }
     }
 
+    // ==================== attached commands: record first (UltiKits/UltiMail#31) ====================
+
+    /**
+     * The maintainer's answer of 2026-09-24, applied to a mail's attached commands (the same cause as
+     * the attachment claim): write the executed marker before running any command, run none when it
+     * cannot be written and tell the reader, and after a successful write run each command in its own
+     * guard, logging a WARNING for each one that throws - it is not retried, and it does not stop the
+     * commands after it. Asserted on the commands that actually ran and the mail's own flag.
+     */
+    @Nested
+    @DisplayName("executeMailCommands record-first tests")
+    class ExecuteMailCommandsRecordFirstTests {
+
+        private final List<String> ran = new ArrayList<>();
+
+        @BeforeEach
+        void recordCommands() {
+            lenient().when(receiver.performCommand(anyString())).thenAnswer(inv -> {
+                String command = inv.getArgument(0);
+                if (command.startsWith("boom")) {
+                    throw new RuntimeException("executor failed");
+                }
+                ran.add(command);
+                return true;
+            });
+            ConsoleCommandSender console = mock(ConsoleCommandSender.class);
+            mockedBukkit.when(Bukkit::getConsoleSender).thenReturn(console);
+            mockedBukkit.when(() -> Bukkit.dispatchCommand(any(), anyString())).thenAnswer(inv -> {
+                ran.add("console:" + inv.getArgument(1));
+                return true;
+            });
+        }
+
+        private MailData mailWithCommands(String json) {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            mail.setId("mail-7");
+            mail.setCommands(json);
+            return mail;
+        }
+
+        @Test
+        @DisplayName("the executed marker cannot be written (unchecked database error): no command runs and the reader is told")
+        void aFailedMarkerWriteRunsNoCommand() throws Exception {
+            MailData mail = mailWithCommands("[\"give %player% diamond 1\",\"console:eco give %player% 100\"]");
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(mail);
+
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).isEmpty();
+            assertThat(mail.isCommandsExecuted()).isFalse();
+            verify(receiver).sendMessage(ArgumentMatchers.<String>argThat(m -> m.contains("[mail_commands_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("the executed marker cannot be written (IllegalAccessException): no command runs")
+        void aCheckedMarkerWriteFailureRunsNoCommand() throws Exception {
+            MailData mail = mailWithCommands("[\"give %player% diamond 1\"]");
+            doThrow(new IllegalAccessException("field not accessible")).when(mockDataOperator).update(mail);
+
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).isEmpty();
+            assertThat(mail.isCommandsExecuted()).isFalse();
+        }
+
+        @Test
+        @DisplayName("the executed marker is written before any command runs")
+        void theMarkerIsWrittenBeforeAnyCommand() throws Exception {
+            MailData mail = mailWithCommands("[\"give %player% diamond 1\",\"console:eco give %player% 100\"]");
+            List<Integer> ranAtWrite = new ArrayList<>();
+            List<Boolean> markedAtWrite = new ArrayList<>();
+            doAnswer(inv -> {
+                ranAtWrite.add(ran.size());
+                markedAtWrite.add(((MailData) inv.getArgument(0)).isCommandsExecuted());
+                return null;
+            }).when(mockDataOperator).update(mail);
+
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ranAtWrite).containsExactly(0);
+            assertThat(markedAtWrite).containsExactly(true);
+            assertThat(ran).containsExactly("give ReceiverPlayer diamond 1", "console:eco give ReceiverPlayer 100");
+        }
+
+        @Test
+        @DisplayName("across a failed marker write the commands run exactly once")
+        void theCommandsRunExactlyOnce() throws Exception {
+            MailData mail = mailWithCommands("[\"give %player% diamond 1\"]");
+            doThrow(new DataAccessException("connection lost")).doNothing().when(mockDataOperator).update(mail);
+
+            mailService.executeMailCommands(receiver, mail);
+            mailService.executeMailCommands(receiver, mail);
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).containsExactly("give ReceiverPlayer diamond 1");
+            assertThat(mail.isCommandsExecuted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("a command that throws is logged at WARNING naming the mail and the command, and the rest still run")
+        void aThrowingCommandIsLoggedAndDoesNotStopTheRest() throws Exception {
+            MailData mail = mailWithCommands("[\"boom now\",\"give %player% diamond 1\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+            mailService.executeMailCommands(receiver, mail);
+
+            assertThat(ran).containsExactly("give ReceiverPlayer diamond 1");
+            assertThat(mail.isCommandsExecuted()).isTrue();
+            ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
+            verify(TestHelper.getMockPlugin().getLogger(), atLeastOnce()).warn(warning.capture());
+            assertThat(warning.getAllValues()).anyMatch(line -> line.contains("[log_mail_command_failed]"));
+        }
+    }
+
     // ==================== claimItems edge cases ====================
 
     @Nested
@@ -1662,7 +1777,7 @@ class MailServiceTest {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setItems("not-valid-base64-data");
 
-            ItemStack[] result = mailService.claimItems(mail, receiver);
+            ItemStack[] result = mailService.claimItems(mail, receiver).getItems();
 
             // deserializeItems returns empty array on error
             assertThat(result).isEmpty();

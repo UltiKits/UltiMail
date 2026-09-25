@@ -1,0 +1,148 @@
+package com.ultikits.plugins.mail.gui;
+
+import com.ultikits.plugins.mail.entity.MailData;
+import com.ultikits.plugins.mail.service.MailService;
+import com.ultikits.plugins.mail.utils.MockBukkitHelper;
+import com.ultikits.plugins.mail.utils.TestHelper;
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
+
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * The mailbox GUI's click handler rendering the outcome of a claim, and re-running a mail's
+ * attached commands after a refused record (UltiKits/UltiMail#31).
+ * <p>
+ * The handler is private and reached here by reflection, the same way a click reaches it through
+ * the icon's callback; the player is a real MockBukkit player so the messages read are the ones the
+ * player receives.
+ */
+@DisplayName("MailboxGUI claim rendering (UltiKits/UltiMail#31)")
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
+class MailboxGUIClaimTest {
+
+    private ServerMock server;
+    private PlayerMock player;
+    private MailService mailService;
+    private MailboxGUI gui;
+
+    @BeforeEach
+    void setUp() {
+        server = MockBukkitHelper.bootstrapServer();
+        UltiToolsPlugin plugin = TestHelper.mockUltiToolsPlugin();
+        player = server.addPlayer("reader");
+        mailService = mock(MailService.class);
+        when(mailService.getInbox(any())).thenReturn(new ArrayList<>());
+        gui = new MailboxGUI(player, mailService, plugin);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestHelper.cleanupMocks();
+        MockBukkitHelper.safeUnmock();
+    }
+
+    @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+    private void click(MailData mail) throws Exception {
+        Method handler = MailboxGUI.class.getDeclaredMethod("handleMailClick", MailData.class);
+        handler.setAccessible(true);
+        handler.invoke(gui, mail);
+    }
+
+    private List<String> messages() {
+        List<String> received = new ArrayList<>();
+        String line;
+        while ((line = player.nextMessage()) != null) {
+            received.add(line);
+        }
+        return received;
+    }
+
+    private MailData unclaimedMailWithItems() {
+        MailData mail = new MailData();
+        mail.setId("mail-9");
+        mail.setRead(true);
+        mail.setItems("payload");
+        mail.setClaimed(false);
+        return mail;
+    }
+
+    @Test
+    @DisplayName("a claim that could not be recorded is reported as refused, never as a success")
+    void aClaimThatCouldNotBeRecordedIsReportedAsRefused() throws Exception {
+        MailData mail = unclaimedMailWithItems();
+        when(mailService.getItemCount(mail)).thenReturn(1);
+        when(mailService.claimItems(mail, player)).thenReturn(MailService.ClaimResult.notRecorded());
+
+        click(mail);
+
+        List<String> received = messages();
+        assertThat(received).anyMatch(m -> m.contains("[claim_not_recorded]"));
+        assertThat(received).noneMatch(m -> m.contains("[claim_success]"));
+    }
+
+    @Test
+    @DisplayName("control: a recorded claim still reports its success with the item count")
+    void aRecordedClaimReportsSuccess() throws Exception {
+        MailData mail = unclaimedMailWithItems();
+        when(mailService.getItemCount(mail)).thenReturn(1);
+        when(mailService.claimItems(mail, player))
+                .thenReturn(MailService.ClaimResult.claimed(new ItemStack[]{new ItemStack(Material.DIAMOND)}));
+
+        click(mail);
+
+        assertThat(messages()).anyMatch(m -> m.contains("[claim_success]"));
+    }
+
+    /**
+     * After a refused marker write the reader is told nothing ran and to read the mail again - which
+     * has to be true in the GUI as well: the mail is already marked read by then, so the commands
+     * must be retried whenever their executed flag is unset, not only on the first, unread click.
+     */
+    @Test
+    @DisplayName("a read mail whose commands are not marked executed has them retried on the next click")
+    void unexecutedCommandsAreRetriedOnARereadMail() throws Exception {
+        MailData mail = new MailData();
+        mail.setId("mail-10");
+        mail.setRead(true);
+        mail.setCommands("[\"give %player% diamond 1\"]");
+        mail.setCommandsExecuted(false);
+
+        click(mail);
+
+        verify(mailService).executeMailCommands(player, mail);
+    }
+
+    @Test
+    @DisplayName("control: commands already marked executed are not run again")
+    void executedCommandsAreNotRunAgain() throws Exception {
+        MailData mail = new MailData();
+        mail.setId("mail-11");
+        mail.setRead(true);
+        mail.setCommands("[\"give %player% diamond 1\"]");
+        mail.setCommandsExecuted(true);
+
+        click(mail);
+
+        verify(mailService, never()).executeMailCommands(any(), any());
+    }
+}
