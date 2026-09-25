@@ -91,17 +91,31 @@ class MailConfigTextTest {
         }
     }
 
-    /** The 6 settings, with the one default each shipped in every earlier version. */
+    /**
+     * The 6 settings, with the one default each shipped in every earlier version. The four whose
+     * catalogue key already existed come first, so a check that fails reports the file's value before
+     * a key this change adds.
+     */
     private static final List<Setting> SETTINGS = Arrays.asList(
-            new Setting("mailReceivedMessage", "messages.mail-received", "mail_received",
-                    "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"),
-            new Setting("serverName", "recall.server-name", "recall_server_name", "Minecraft服务器"),
             new Setting("recallSubject", "recall.subject", "recall_subject", "[{SERVER}] 回归召唤"),
             new Setting("recallContent", "recall.content", "recall_content",
                     "亲爱的玩家，{SERVER}想念你了！\n\n快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}"),
             new Setting("recallEmailSubject", "email.recall-subject", "recall_email_subject", "[{SERVER}] 我们想念你！"),
             new Setting("recallEmailContent", "email.recall-content", "recall_email_content",
-                    "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}"));
+                    "亲爱的 {PLAYER}，\n\n{SERVER} 服务器想念你了！快回来看看吧，我们期待与你重逢！\n\n发送者: {SENDER}"),
+            new Setting("mailReceivedMessage", "messages.mail-received", "mail_received",
+                    "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"),
+            new Setting("serverName", "recall.server-name", "recall_server_name", "Minecraft服务器"));
+
+    /** The setting stored at {@code path}. */
+    private static Setting setting(String path) {
+        for (Setting s : SETTINGS) {
+            if (s.path.equals(path)) {
+                return s;
+            }
+        }
+        throw new IllegalArgumentException(path);
+    }
 
     /** The fields that carried {@code @NotEmpty} at origin/master: the 6 above plus the two SMTP addresses. */
     private static final Set<String> NOT_EMPTY_AT_MASTER = new TreeSet<>();
@@ -333,7 +347,7 @@ class MailConfigTextTest {
         }
 
         assertThat(bytes()).isEqualTo(before);
-        assertThat(config.getRecallSubject()).isEqualTo(SETTINGS.get(2).text("en"));
+        assertThat(config.getRecallSubject()).isEqualTo(setting("recall.subject").text("en"));
     }
 
     @Test
@@ -421,7 +435,7 @@ class MailConfigTextTest {
             MailConfig config = load();
             start(config);
             String fileText = onDisk().getString("messages.mail-received");
-            assertThat(fileText).as(code).isEqualTo(SETTINGS.get(0).text(code));
+            assertThat(fileText).as(code).isEqualTo(setting("messages.mail-received").text(code));
             Player receiver = mock(Player.class);
             when(receiver.isOnline()).thenReturn(true);
             MailService service = new MailService();
@@ -454,7 +468,7 @@ class MailConfigTextTest {
             start(config);
             YamlConfiguration disk = onDisk();
             assertThat(disk.getString("recall.server-name")).as(code).isEqualTo("&bMy Survival");
-            assertThat(disk.getString("recall.subject")).as(code).isEqualTo(SETTINGS.get(2).text(code));
+            assertThat(disk.getString("recall.subject")).as(code).isEqualTo(setting("recall.subject").text(code));
 
             UltiToolsPlugin module = mock(UltiToolsPlugin.class);
             DataOperator<MailData> mails = mock(DataOperator.class);
