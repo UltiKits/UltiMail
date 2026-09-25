@@ -144,6 +144,7 @@ log_serialize_failed: "序列化物品失败：{ERROR}"
 log_deserialize_failed: "反序列化物品失败：{ERROR}"
 log_recall_email_failed: "向 {EMAIL} 发送电子邮件失败：{ERROR}"
 log_recall_no_ultilogin: "未找到 UltiLogin，改用邮件数据查找已注册玩家"
+log_attachment_close_failed: "卸载时无法关闭一个附件选择界面；其中的物品已归还给其所有者"
 log_removed_key_check_failed: "无法检查 {FILE} 中已移除的配置键；模块将跳过这项检查继续运行。"
 log_config_default_save_failed: "替换旧版出厂文本默认值后无法保存 {FILE}；下次启动时会再次替换。"
 

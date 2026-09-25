@@ -144,6 +144,7 @@ log_serialize_failed: "Failed to serialize items: {ERROR}"
 log_deserialize_failed: "Failed to deserialize items: {ERROR}"
 log_recall_email_failed: "Failed to send email to {EMAIL}: {ERROR}"
 log_recall_no_ultilogin: "UltiLogin not found, using mail data to find registered players"
+log_attachment_close_failed: "Could not close an attachment selector during unload; its items were already returned to their owner"
 log_removed_key_check_failed: "Could not check {FILE} for removed configuration keys; the module continues without that check."
 log_config_default_save_failed: "Could not save {FILE} after replacing the old shipped text defaults; they are replaced again at the next start."
 

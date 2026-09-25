@@ -31,6 +31,8 @@ public final class RemovedConfigKeys {
     /**
      * Every key removed from {@code config/mail.yml}, mapped to the language-file key of what an
      * operator should be told about it. Insertion order is the order the warnings are emitted in.
+     * The values are informational: the text is read by {@link #reasonFor}, whose literal lookups the
+     * language guard checks, so a key added here needs a case there too (a missing case fails loudly).
      */
     private static final Map<String, String> REMOVED;
 

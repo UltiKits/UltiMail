@@ -209,8 +209,12 @@ public class SendMailCommand extends BaseCommandExecutor {
         sender.sendMessage(ChatColor.GOLD + "=== " + i18n("help_sendmail_title") + " ===");
         sender.sendMessage(ChatColor.YELLOW + "/sendmail <" + i18n("arg_player") + "> <" + i18n("arg_subject") + ">" 
             + ChatColor.WHITE + " - " + i18n("help_sendmail_text"));
-        sender.sendMessage(ChatColor.YELLOW + "/sendmail <" + i18n("arg_player") + "> <" + i18n("arg_subject") + "> attach" 
-            + ChatColor.WHITE + " - " + i18n("help_sendmail_attach"));
+        // help_sendmail_attach already holds the whole line ("/sendmail <player> <subject> attach - ..."),
+        // so it is shown once, the command part yellow and the description white.
+        String attach = i18n("help_sendmail_attach");
+        int dash = attach.indexOf(" - ");
+        sender.sendMessage(dash < 0 ? ChatColor.YELLOW + attach
+            : ChatColor.YELLOW + attach.substring(0, dash) + ChatColor.WHITE + attach.substring(dash));
         sender.sendMessage(ChatColor.GRAY + i18n("help_cancel_hint"));
     }
     

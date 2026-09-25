@@ -27,9 +27,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `/mail help` now lists `/mail sentgui`, and each help line shows its command once. Every line used
-  to print the command twice, because the language file's help text already starts with it
-  (UltiKits/UltiMail#21).
+- `/mail help` now lists `/mail sentgui`, and each help line shows its command once, as does the
+  attach line of `/sendmail` help. Those lines used to print the command twice, because the language
+  file's help text already starts with it (UltiKits/UltiMail#21).
 - `language: en` now applies to the unread-mail notice another module can send through UltiMail's
   mail service, which was fixed Chinese text (UltiKits/UltiMail#21), and to everything `/recall`
   prints — the permission refusal, the progress and summary lines and its help — and to the recall
@@ -43,11 +43,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   language file carried), and under `language: zh` the join notification's hover text comes from the
   Chinese language file (UltiKits/UltiMail#28). `language: zh` also applies to the console lines that
   were fixed English text: a failed mail read, claim, command run, update or item conversion, a
-  failed recall email, the missing-UltiLogin line of `/recall`, and the warning about a key this
+  failed recall email, the missing-UltiLogin line of `/recall`, a selector that cannot be closed when
+  the module unloads (now logged through the module's own logger), and the warning about a key this
   version no longer reads. Their English wording is unchanged, except that the warning for a
   leftover `messages.new-mail` no longer says the notification leaves the count out.
-- `/mail help` 现在会列出 `/mail sentgui`，而且每行帮助只显示一次命令。此前每行都会把命令打印两遍，因为语言文件里的
-  帮助文本本身已经以命令开头（UltiKits/UltiMail#21）。
+- `/mail help` 现在会列出 `/mail sentgui`，而且每行帮助只显示一次命令，`/sendmail` 帮助中关于附件的那一行也是如此。
+  此前这些行都会把命令打印两遍，因为语言文件里的帮助文本本身已经以命令开头（UltiKits/UltiMail#21）。
 - `language: en` 现在对其他模块可通过 UltiMail 的邮件服务发送的未读邮件提醒生效（原先是写死的中文，UltiKits/UltiMail#21），
   也对 `/recall` 打印的全部内容生效——权限拒绝、进度与汇总行以及帮助——并对召回邮件和电子邮件的文本生效
   （UltiKits/UltiMail#22）。三个命令的描述（由 `/help` 显示）也跟随 `language`。
@@ -56,8 +57,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （UltiKits/UltiMail#24）。
 - 控制台上的启用日志现在跟随 `language`（它原先查找的是任何语言文件都没有的中文句子），`language: zh` 下登录提醒的
   悬停文本来自中文语言文件（UltiKits/UltiMail#28）。`language: zh` 也对原先写死为英文的控制台日志生效：读取、领取、
-  执行命令、更新邮件或转换物品失败，召回电子邮件发送失败，`/recall` 找不到 UltiLogin 的提示，以及本版本不再读取的
-  配置键的警告。它们的英文措辞不变，只是残留的 `messages.new-mail` 的警告不再说提醒会漏掉数量。
+  执行命令、更新邮件或转换物品失败，召回电子邮件发送失败，`/recall` 找不到 UltiLogin 的提示、模块卸载时无法关闭附件选择界面（现在通过本模块自己的日志器输出），
+  以及本版本不再读取的配置键的警告。它们的英文措辞不变，只是残留的 `messages.new-mail` 的警告不再说提醒会漏掉数量。
 
 - Reloading this module (`/ul reload UltiMail`, or `/ul reload` for every module) now re-reads
   `config/mail.yml` and refreshes the language files, so an edited value such as
