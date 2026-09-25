@@ -509,7 +509,7 @@ public class MailService {
      * (UltiKits/UltiMail#31): the executed marker is written <b>before</b> any command runs. When it
      * cannot be written, no command runs and the reader is told, so reading the mail again retries.
      * After a successful write each command runs in its own guard: one that throws, or that the server
-     * reports it did not run ({@code false}: an unknown or refused command), is logged at WARNING,
+     * reports as not run ({@code false}: an unknown command, or one whose handler reported failure), is logged at WARNING,
      * naming the mail and the command, and is not retried - the marker is already written - and it
      * does not stop the commands after it. Before, the marker was written after every command
      * had run, so a failed write or a command that threw part-way ran the earlier commands again on
@@ -558,8 +558,9 @@ public class MailService {
                 } else {
                     ran = player.performCommand(processedCmd);
                 }
-                // The server answers false for a command it did not run (unknown, or refused by its
-                // executor) instead of throwing; it is not retried either, so it is logged the same way.
+                // The server answers false for an unknown command, or one whose handler reported failure,
+                // instead of throwing; it is not retried either, so it is logged the same way. A command
+                // that runs and fails without reporting it (a denied permission) answers true.
                 if (!ran) {
                     plugin.getLogger().warn(fillOnce(plugin.i18n("log_mail_command_rejected"),
                             "{MAIL}", String.valueOf(mail.getId()),
