@@ -37,12 +37,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   now answers `This mail has no attachments!` instead of reporting 0 items claimed, and a storage error
   while marking a mail read is logged instead of aborting the read. A mail whose attached commands an
   earlier version left unfinished (a command that failed part-way, or a failed record) runs them once
-  more when it is next read, then never again (UltiKits/UltiMail#31).
+  more when it is next read, then never again. For plugins that call `MailService`, `claimItems` keeps
+  its signature and returns no items for a refused claim; the new `claimAttachment` also tells a
+  refused claim apart from one with nothing to claim (UltiKits/UltiMail#31).
 - 修复：邮件附件与附带命令先写入已领取记录再发放，记录写失败时拒绝领取，不再可以重复领取。存储无法记录领取时，`/mail claim`
   和收件箱界面会回复「领取记录无法保存，未发放任何物品，请重试。」且不发放任何物品；无法记录附带命令已执行时，一条命令都不执行，
   并提示读者重新阅读邮件。执行失败的附带命令会连同邮件和命令一起记入日志，不会再次执行，也不再阻止其后的命令。对无法读取的附件执行
   `/mail claim` 现在回复「这封邮件没有附件！」，而不是报告领取了 0 个物品；标记邮件已读时的存储错误会被记入日志，不再中断阅读。
-  旧版本未执行完附带命令的邮件（命令中途失败或记录写入失败），下次阅读时会把这些命令再执行一次，之后不再执行（UltiKits/UltiMail#31）。
+  旧版本未执行完附带命令的邮件（命令中途失败或记录写入失败），下次阅读时会把这些命令再执行一次，之后不再执行。调用 `MailService` 的插件：
+  `claimItems` 签名不变，被拒绝的领取返回空数组；新增的 `claimAttachment` 还能区分「被拒绝」与「无可领取」（UltiKits/UltiMail#31）。
 
 - `/mail help` now lists `/mail sentgui`, and each help line shows its command once, as does the
   attach line of `/sendmail` help. Those lines used to print the command twice, because the language

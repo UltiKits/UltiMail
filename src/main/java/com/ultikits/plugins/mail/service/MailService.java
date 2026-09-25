@@ -443,7 +443,7 @@ public class MailService {
      *
      * @return the outcome, never null / 结果，不为 null
      */
-    public ClaimResult claimItems(MailData mail, Player player) {
+    public ClaimResult claimAttachment(MailData mail, Player player) {
         if (mail.isClaimed() || mail.getItems() == null || mail.getItems().isEmpty()) {
             return ClaimResult.nothingToClaim();
         }
@@ -468,6 +468,23 @@ public class MailService {
         // out of this method and aborted the whole claim.
         ItemReturns.giveOrDrop(player, items);
         return ClaimResult.claimed(items);
+    }
+
+    /**
+     * Claims a mail's attachment, returning what was handed over.
+     * <p>
+     * Kept with its original signature for plugins compiled against an earlier version: this class is
+     * advertised to other plugins, and changing the return type would change the method's descriptor.
+     * It is {@link #claimAttachment} with the outcome reduced to the items: a claim refused because it
+     * could not be recorded returns an empty array and hands nothing over, exactly like a claim with
+     * nothing to claim. Call {@link #claimAttachment} to tell the two apart.
+     * <p>
+     * 保留原签名以兼容按旧版本编译的插件；需要区分「无可领取」与「记录失败被拒绝」时请使用 {@link #claimAttachment}。
+     *
+     * @return the items handed over, or an empty array / 已发放的物品，或空数组
+     */
+    public ItemStack[] claimItems(MailData mail, Player player) {
+        return claimAttachment(mail, player).getItems();
     }
 
     /**
@@ -526,9 +543,13 @@ public class MailService {
         }
 
         for (String command : commands) {
-            // Replace placeholders
-            String processedCmd = command.replace("%player%", player.getName());
+            // Everything per command is inside the guard - a null entry from an API caller included - so
+            // one bad entry can neither stop the commands after it nor escape after the marker was
+            // written (Codex review round 1).
+            String processedCmd = String.valueOf(command);
             try {
+                // Replace placeholders
+                processedCmd = command.replace("%player%", player.getName());
                 // Check if console command
                 if (processedCmd.toLowerCase().startsWith("console:")) {
                     String consoleCmd = processedCmd.substring(8).trim();

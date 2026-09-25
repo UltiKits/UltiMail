@@ -139,7 +139,7 @@ public class MailboxGUI extends BasePaginationPage {
                 player.sendMessage(ChatColor.RED + i18n("claim_inventory_full")
                     .replace("{0}", String.valueOf(requiredSlots)));
             } else {
-                MailService.ClaimResult result = mailService.claimItems(mail, player);
+                MailService.ClaimResult result = mailService.claimAttachment(mail, player);
                 if (result.getStatus() == MailService.ClaimResult.Status.CLAIMED) {
                     player.sendMessage(ChatColor.GREEN + i18n("claim_success")
                         .replace("{0}", String.valueOf(result.getItems().length)));

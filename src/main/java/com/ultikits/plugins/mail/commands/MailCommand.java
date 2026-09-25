@@ -192,7 +192,7 @@ public class MailCommand extends BaseCommandExecutor {
             return;
         }
         
-        MailService.ClaimResult result = mailService.claimItems(mail, player);
+        MailService.ClaimResult result = mailService.claimAttachment(mail, player);
         switch (result.getStatus()) {
             case CLAIMED:
                 player.sendMessage(ChatColor.GREEN + i18n("claim_success")
