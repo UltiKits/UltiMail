@@ -266,10 +266,9 @@ public class MailService {
     private void notifyReceiver(String receiverName, String senderName) {
         Player receiver = Bukkit.getPlayerExact(receiverName);
         if (receiver != null && receiver.isOnline()) {
-            // A configured message names the sender {SENDER}; the language file's notify_mail_received,
-            // shown while the setting is blank, names it {0}.
-            String message = config.getMailReceivedMessage().replace("{SENDER}", senderName)
-                    .replace("{0}", senderName);
+            // The setting names the sender {SENDER}, and so does the text the module writes into it; a
+            // literal {0} in an operator's text is shown as written, as in every earlier version.
+            String message = config.getMailReceivedMessage().replace("{SENDER}", senderName);
             receiver.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
         }
     }
