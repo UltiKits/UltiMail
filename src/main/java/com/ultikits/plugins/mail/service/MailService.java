@@ -9,6 +9,7 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.PostConstruct;
 import com.ultikits.ultitools.annotations.Service;
+import com.ultikits.ultitools.exceptions.DataAccessException;
 import com.ultikits.ultitools.interfaces.DataOperator;
 
 import org.bukkit.Bukkit;
@@ -55,6 +56,7 @@ public class MailService {
 
     private static final Gson GSON = new Gson();
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>(){}.getType();
+    private static final java.util.regex.Pattern PLACEHOLDER = java.util.regex.Pattern.compile("\\{[A-Z]+}");
 
     /**
      * Initialize the mail service.
@@ -359,59 +361,172 @@ public class MailService {
     }
     
     /**
-     * Claim items from mail.
-     * Does NOT check for inventory space - caller should check first.
-     * 
-     * @return claimed items, or empty array if already claimed
+     * Outcome of claiming a mail's attachment.
+     * <p>
+     * Typed because the caller must tell the player three different things: the items arrived; there
+     * was nothing to claim; or the claim was refused because it could not be recorded - in which case
+     * nothing was given and the player may try again (UltiKits/UltiMail#31). An empty array could not
+     * tell the last two apart, and the command reported a refused claim as a success.
+     * <p>
+     * 领取附件的结果：已领取、没有可领取的物品、或因记录无法写入而被拒绝（未发放任何物品）。
      */
-    public ItemStack[] claimItems(MailData mail, Player player) {
-        if (mail.isClaimed() || mail.getItems() == null || mail.getItems().isEmpty()) {
-            return new ItemStack[0];
+    public static final class ClaimResult {
+
+        /** What happened to the claim. */
+        public enum Status {
+            /** The claimed flag was written and the attachment handed over. */
+            CLAIMED,
+            /** Already claimed, no attachment, or an attachment that could not be read. */
+            NOTHING_TO_CLAIM,
+            /** The claimed flag could not be written, so nothing was handed over. */
+            NOT_RECORDED
         }
-        
+
+        private static final ItemStack[] NONE = new ItemStack[0];
+        private static final ClaimResult NOTHING = new ClaimResult(Status.NOTHING_TO_CLAIM, NONE);
+        private static final ClaimResult REFUSED = new ClaimResult(Status.NOT_RECORDED, NONE);
+
+        private final Status status;
+        private final ItemStack[] items;
+
+        private ClaimResult(Status status, ItemStack[] items) {
+            this.status = status;
+            this.items = items;
+        }
+
+        /** The attachment was recorded as claimed and handed over. */
+        public static ClaimResult claimed(ItemStack[] items) {
+            return new ClaimResult(Status.CLAIMED, items);
+        }
+
+        /** There was nothing to claim. */
+        public static ClaimResult nothingToClaim() {
+            return NOTHING;
+        }
+
+        /** The claim could not be recorded; nothing was handed over. */
+        public static ClaimResult notRecorded() {
+            return REFUSED;
+        }
+
+        public Status getStatus() {
+            return status;
+        }
+
+        /** The items handed over - as the mail stored them - or an empty array unless claimed. */
+        public ItemStack[] getItems() {
+            return items;
+        }
+    }
+
+    /**
+     * Claims a mail's attachment: records it as claimed first, and hands it over only once that
+     * record was written.
+     * <p>
+     * The order is the maintainer's decision of 2026-09-24 for a one-time claim whose record cannot be
+     * written - write the record first and refuse the claim when the write fails. The previous order
+     * handed the items over first and only logged a failed write, and because {@link #getInbox}
+     * re-reads the table on every command the same attachment could then be claimed again at once
+     * (UltiKits/UltiMail#31). On a failed write the in-memory flag is restored, nothing is handed over,
+     * and the result tells the caller so. Both write failures are caught: {@code update}'s declared
+     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
+     * backends throw on any SQL error. On the JSON storage backend a write only reaches an in-memory
+     * cache that a timer flushes to disk, so a disk failure there cannot be seen at claim time - the
+     * framework's storage contract, not changed here.
+     * <p>
+     * Does NOT check for inventory space - caller should check first; anything that does not fit is
+     * dropped at the player's feet by {@link ItemReturns#giveOrDrop}.
+     * <p>
+     * 先写入「已领取」记录，写入成功后才发放附件；写入失败时拒绝领取，不发放任何物品。
+     *
+     * @return the outcome, never null / 结果，不为 null
+     */
+    public ClaimResult claimItems(MailData mail, Player player) {
+        if (mail.isClaimed() || mail.getItems() == null || mail.getItems().isEmpty()) {
+            return ClaimResult.nothingToClaim();
+        }
+
         ItemStack[] items = deserializeItems(mail.getItems());
         if (items == null || items.length == 0) {
-            return new ItemStack[0];
+            return ClaimResult.nothingToClaim();
         }
-        
+
+        mail.setClaimed(true);
+        String failure = writeFailure(mail);
+        if (failure != null) {
+            mail.setClaimed(false);
+            plugin.getLogger().error(plugin.i18n("log_claim_failed").replace("{ERROR}", failure));
+            return ClaimResult.notRecorded();
+        }
+
         // Hand the attachment over through the module's one return helper rather than repeating its
         // addItem/dropItemNaturally pair here: ItemReturns#giveOrDrop declares itself the single
         // place this module hands items back, and it also skips the null and air entries a stored
         // Base64 payload round-trips faithfully -- passing those straight to Inventory#addItem threw
         // out of this method and aborted the whole claim.
         ItemReturns.giveOrDrop(player, items);
+        return ClaimResult.claimed(items);
+    }
 
-        // Mark as claimed
-        mail.setClaimed(true);
+    /**
+     * Writes a mail's flags and returns {@code null}, or the failure's message instead of throwing:
+     * the relational backends throw the unchecked {@link DataAccessException} on any SQL error, and
+     * {@code update} declares {@code IllegalAccessException}.
+     */
+    private String writeFailure(MailData mail) {
         try {
             dataOperator.update(mail);
-        } catch (IllegalAccessException e) {
-            plugin.getLogger().error(plugin.i18n("log_claim_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
+            return null;
+        } catch (IllegalAccessException | DataAccessException e) {
+            return String.valueOf(e.getMessage());
         }
-        
-        return items;
     }
-    
+
     /**
      * Execute commands attached to a mail.
      * Supports mixed mode: normal commands run as player, console: prefixed commands run as console.
      * Supports %player% placeholder.
+     * <p>
+     * The commands are a one-time hand-over like an attachment, so they follow the same decision
+     * (UltiKits/UltiMail#31): the executed marker is written <b>before</b> any command runs. When it
+     * cannot be written, no command runs and the reader is told, so reading the mail again retries.
+     * After a successful write each command runs in its own guard: one that throws is logged at
+     * WARNING, naming the mail and the command, and is not retried - the marker is already written -
+     * and it does not stop the commands after it. Before, the marker was written after every command
+     * had run, so a failed write or a command that threw part-way ran the earlier commands again on
+     * the next read.
+     * <p>
+     * 附带命令先写入「已执行」标记再执行；标记写入失败则不执行任何命令并提示读者。
      */
     public void executeMailCommands(Player player, MailData mail) {
         if (!mail.hasCommands() || mail.isCommandsExecuted()) {
             return;
         }
-        
+
+        List<String> commands;
         try {
-            List<String> commands = GSON.fromJson(mail.getCommands(), STRING_LIST_TYPE);
-            if (commands == null || commands.isEmpty()) {
-                return;
-            }
-            
-            for (String command : commands) {
-                // Replace placeholders
-                String processedCmd = command.replace("%player%", player.getName());
-                
+            commands = GSON.fromJson(mail.getCommands(), STRING_LIST_TYPE);
+        } catch (RuntimeException e) {
+            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
+            return;
+        }
+        if (commands == null || commands.isEmpty()) {
+            return;
+        }
+
+        mail.setCommandsExecuted(true);
+        String failure = writeFailure(mail);
+        if (failure != null) {
+            mail.setCommandsExecuted(false);
+            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", failure));
+            player.sendMessage(ChatColor.RED + plugin.i18n("mail_commands_not_recorded"));
+            return;
+        }
+
+        for (String command : commands) {
+            // Replace placeholders
+            String processedCmd = command.replace("%player%", player.getName());
+            try {
                 // Check if console command
                 if (processedCmd.toLowerCase().startsWith("console:")) {
                     String consoleCmd = processedCmd.substring(8).trim();
@@ -419,15 +534,32 @@ public class MailService {
                 } else {
                     player.performCommand(processedCmd);
                 }
+            } catch (RuntimeException e) {
+                plugin.getLogger().warn(fillOnce(plugin.i18n("log_mail_command_failed"),
+                        "{MAIL}", String.valueOf(mail.getId()),
+                        "{COMMAND}", processedCmd,
+                        "{ERROR}", String.valueOf(e.getMessage())));
             }
-            
-            // Mark commands as executed
-            mail.setCommandsExecuted(true);
-            dataOperator.update(mail);
-            
-        } catch (Exception e) {
-            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
         }
+    }
+
+    /**
+     * Fills {@code {NAME}} placeholders in one pass, so a value that itself contains a placeholder
+     * token (a command or an error text can) is inserted as written and not expanded again.
+     */
+    private static String fillOnce(String template, String... namesAndValues) {
+        Map<String, String> values = new HashMap<>();
+        for (int i = 0; i + 1 < namesAndValues.length; i += 2) {
+            values.put(namesAndValues[i], namesAndValues[i + 1]);
+        }
+        java.util.regex.Matcher m = PLACEHOLDER.matcher(template);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            String value = values.get(m.group());
+            m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(value != null ? value : m.group()));
+        }
+        m.appendTail(out);
+        return out.toString();
     }
     
     /**

@@ -46,6 +46,8 @@ claim_success: "成功领取了 {0} 个物品！"
 claim_already_claimed: "附件已经领取过了！"
 claim_no_items: "这封邮件没有附件！"
 claim_inventory_full: "背包空间不足！需要 {0} 个空位"
+claim_not_recorded: "领取记录无法保存，未发放任何物品，请重试。"
+mail_commands_not_recorded: "无法记录此邮件附带命令的执行状态，因此一条命令都没有执行。请重新阅读邮件以重试。"
 
 # === 删除邮件 ===
 delete_success: "邮件已删除！"
@@ -139,6 +141,7 @@ notify_unread_mail: "&e[UltiMail] &a你有 {COUNT} 封未读邮件! 使用 /mail
 log_mark_read_failed: "将邮件标记为已读失败：{ERROR}"
 log_claim_failed: "领取附件失败：{ERROR}"
 log_mail_commands_failed: "执行邮件命令失败：{ERROR}"
+log_mail_command_failed: "邮件 {MAIL} 附带的命令执行失败，且不会再次执行：{COMMAND} - {ERROR}"
 log_update_mail_failed: "更新邮件失败：{ERROR}"
 log_serialize_failed: "序列化物品失败：{ERROR}"
 log_deserialize_failed: "反序列化物品失败：{ERROR}"

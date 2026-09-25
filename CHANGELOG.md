@@ -27,6 +27,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A mail's attachment and its attached commands are now recorded as claimed before they are handed
+  over, and a claim that cannot be recorded is refused instead of being repeatable. When the storage
+  cannot record the claim, `/mail claim` and the mailbox window answer
+  `Your claim could not be recorded, so nothing was given. Please try again.` and give nothing; when it
+  cannot record that the attached commands ran, none of them runs and the reader is told to read the
+  mail again. An attached command that fails is logged with the mail and the command, is not run
+  again, and no longer stops the commands after it. `/mail claim` on an attachment that cannot be read
+  now answers `This mail has no attachments!` instead of reporting 0 items claimed (UltiKits/UltiMail#31).
+- 修复：邮件附件与附带命令先写入已领取记录再发放，记录写失败时拒绝领取，不再可以重复领取。存储无法记录领取时，`/mail claim`
+  和收件箱界面会回复「领取记录无法保存，未发放任何物品，请重试。」且不发放任何物品；无法记录附带命令已执行时，一条命令都不执行，
+  并提示读者重新阅读邮件。执行失败的附带命令会连同邮件和命令一起记入日志，不会再次执行，也不再阻止其后的命令。对无法读取的附件执行
+  `/mail claim` 现在回复「这封邮件没有附件！」，而不是报告领取了 0 个物品（UltiKits/UltiMail#31）。
+
 - `/mail help` now lists `/mail sentgui`, and each help line shows its command once, as does the
   attach line of `/sendmail` help. Those lines used to print the command twice, because the language
   file's help text already starts with it (UltiKits/UltiMail#21).

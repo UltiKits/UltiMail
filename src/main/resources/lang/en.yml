@@ -46,6 +46,8 @@ claim_success: "Successfully claimed {0} items!"
 claim_already_claimed: "Items already claimed!"
 claim_no_items: "This mail has no attachments!"
 claim_inventory_full: "Inventory full! Need {0} empty slots"
+claim_not_recorded: "Your claim could not be recorded, so nothing was given. Please try again."
+mail_commands_not_recorded: "This mail's attached commands could not be recorded as run, so none of them ran. Read the mail again to retry."
 
 # === Delete Mail ===
 delete_success: "Mail deleted!"
@@ -139,6 +141,7 @@ notify_unread_mail: "&e[UltiMail] &aYou have {COUNT} unread mail(s)! Use /mail t
 log_mark_read_failed: "Failed to mark mail as read: {ERROR}"
 log_claim_failed: "Failed to claim items: {ERROR}"
 log_mail_commands_failed: "Failed to execute mail commands: {ERROR}"
+log_mail_command_failed: "An attached command of mail {MAIL} failed and will not be run again: {COMMAND} - {ERROR}"
 log_update_mail_failed: "Failed to update mail: {ERROR}"
 log_serialize_failed: "Failed to serialize items: {ERROR}"
 log_deserialize_failed: "Failed to deserialize items: {ERROR}"
