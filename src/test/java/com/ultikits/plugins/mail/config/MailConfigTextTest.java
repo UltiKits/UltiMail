@@ -357,6 +357,9 @@ class MailConfigTextTest {
         StringBuilder yml = new StringBuilder();
         for (Setting s : SETTINGS) {
             yml.append(s.key).append(": \"Edited ").append(s.key).append("\"\n");
+            // i18n answers the edited text too, so a tracked set built from i18n (or the disk file) would
+            // contain the file's value and rewrite it; only the jar's own catalogue keeps this test green.
+            diskOverrides.put(s.key, "Edited " + s.key);
         }
         for (String code : LANGUAGES) {
             Files.write(lang.resolve(code + ".yml"), yml.toString().getBytes(StandardCharsets.UTF_8));
