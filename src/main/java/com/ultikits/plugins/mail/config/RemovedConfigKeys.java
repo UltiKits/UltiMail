@@ -3,6 +3,7 @@ package com.ultikits.plugins.mail.config;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
+import com.ultikits.plugins.mail.util.Placeholders;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 
 import java.io.File;
@@ -102,10 +103,10 @@ public final class RemovedConfigKeys {
             if (yaml.contains(entry.getKey())) {
                 // No "[UltiMail]" prefix: the module logger adds that itself, and the module is
                 // still named in the sentence for any consumer that does not.
-                warn.accept(plugin.i18n("removed_key_warning")
-                        .replace("{FILE}", configFile.getPath())
-                        .replace("{REASON}", reasonFor(entry.getKey(), plugin))
-                        .replace("{KEY}", entry.getKey()));
+                warn.accept(Placeholders.fill(plugin.i18n("removed_key_warning"),
+                        "{FILE}", configFile.getPath(),
+                        "{REASON}", reasonFor(entry.getKey(), plugin),
+                        "{KEY}", entry.getKey()));
             }
         }
     }
