@@ -585,15 +585,27 @@ public class MailService {
     
     /**
      * Delete mail (soft delete).
+     * <p>
+     * Kept with its original signature for plugins compiled against an earlier version; call
+     * {@link #recordDeletion} to learn whether the deletion was recorded.
      */
     public void deleteMail(MailData mail, UUID playerUuid) {
+        recordDeletion(mail, playerUuid);
+    }
+
+    /**
+     * Deletes a mail for {@code playerUuid} (soft delete; removed for good once both sides deleted it).
+     *
+     * @return whether the deletion was recorded
+     */
+    public boolean recordDeletion(MailData mail, UUID playerUuid) {
         if (mail.getSenderUuid().equals(playerUuid.toString())) {
             mail.setDeletedBySender(true);
         }
         if (mail.getReceiverUuid().equals(playerUuid.toString())) {
             mail.setDeletedByReceiver(true);
         }
-        
+
         // If both deleted, really delete
         if (mail.isDeletedBySender() && mail.isDeletedByReceiver()) {
             dataOperator.delById(mail.getId());
@@ -604,53 +616,91 @@ public class MailService {
                 plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
             }
         }
+        return true;
     }
-    
+
+    /**
+     * What a batch delete did: how many mails it deleted, and how many it could not record.
+     */
+    public static final class DeleteResult {
+        private final int deleted;
+        private final int notRecorded;
+
+        public DeleteResult(int deleted, int notRecorded) {
+            this.deleted = deleted;
+            this.notRecorded = notRecorded;
+        }
+
+        /** @return the number of mails deleted */
+        public int getDeleted() {
+            return deleted;
+        }
+
+        /** @return the number of mails whose deletion could not be recorded; they are still there */
+        public int getNotRecorded() {
+            return notRecorded;
+        }
+    }
+
     /**
      * Delete all mails for a player (receiver side).
-     * 
+     *
      * @return number of mails deleted
      */
     public int deleteAllByReceiver(UUID playerUuid) {
-        List<MailData> mails = getInbox(playerUuid);
-        int count = 0;
-        
-        for (MailData mail : mails) {
-            // Skip if has unclaimed items
-            if (mail.hasItems() && !mail.isClaimed()) {
-                continue;
-            }
-            deleteMail(mail, playerUuid);
-            count++;
-        }
-        
-        return count;
+        return deleteAllFromInbox(playerUuid).getDeleted();
     }
-    
+
+    /**
+     * Deletes every inbox mail of a player that has no unclaimed attachment.
+     *
+     * @return how many were deleted and how many could not be recorded
+     */
+    public DeleteResult deleteAllFromInbox(UUID playerUuid) {
+        return deleteFromInbox(playerUuid, false);
+    }
+
     /**
      * Delete all read mails for a player (receiver side).
-     * 
+     *
      * @return number of mails deleted
      */
     public int deleteReadByReceiver(UUID playerUuid) {
+        return deleteReadFromInbox(playerUuid).getDeleted();
+    }
+
+    /**
+     * Deletes every read inbox mail of a player that has no unclaimed attachment.
+     *
+     * @return how many were deleted and how many could not be recorded
+     */
+    public DeleteResult deleteReadFromInbox(UUID playerUuid) {
+        return deleteFromInbox(playerUuid, true);
+    }
+
+    private DeleteResult deleteFromInbox(UUID playerUuid, boolean readOnly) {
         List<MailData> mails = getInbox(playerUuid);
-        int count = 0;
-        
+        int deleted = 0;
+        int notRecorded = 0;
+
         for (MailData mail : mails) {
-            if (!mail.isRead()) {
+            if (readOnly && !mail.isRead()) {
                 continue;
             }
             // Skip if has unclaimed items
             if (mail.hasItems() && !mail.isClaimed()) {
                 continue;
             }
-            deleteMail(mail, playerUuid);
-            count++;
+            if (recordDeletion(mail, playerUuid)) {
+                deleted++;
+            } else {
+                notRecorded++;
+            }
         }
-        
-        return count;
+
+        return new DeleteResult(deleted, notRecorded);
     }
-    
+
     /**
      * Get mail by ID.
      */

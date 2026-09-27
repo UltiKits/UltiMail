@@ -227,7 +227,7 @@ public class MailCommand extends BaseCommandExecutor {
             return;
         }
         
-        mailService.deleteMail(mail, player.getUniqueId());
+        mailService.recordDeletion(mail, player.getUniqueId());
         player.sendMessage(ChatColor.GREEN + i18n("delete_success"));
     }
     
@@ -238,8 +238,8 @@ public class MailCommand extends BaseCommandExecutor {
      */
     @CmdMapping(format = "delall")
     public void deleteAll(@CmdSender Player player) {
-        int count = mailService.deleteAllByReceiver(player.getUniqueId());
-        player.sendMessage(ChatColor.GREEN + i18n("delete_all_success") + " (" + count + ")");
+        MailService.DeleteResult result = mailService.deleteAllFromInbox(player.getUniqueId());
+        player.sendMessage(ChatColor.GREEN + i18n("delete_all_success") + " (" + result.getDeleted() + ")");
     }
     
     /**
@@ -247,8 +247,8 @@ public class MailCommand extends BaseCommandExecutor {
      */
     @CmdMapping(format = "delread")
     public void deleteRead(@CmdSender Player player) {
-        int count = mailService.deleteReadByReceiver(player.getUniqueId());
-        player.sendMessage(ChatColor.GREEN + i18n("delete_read_success") + " (" + count + ")");
+        MailService.DeleteResult result = mailService.deleteReadFromInbox(player.getUniqueId());
+        player.sendMessage(ChatColor.GREEN + i18n("delete_read_success") + " (" + result.getDeleted() + ")");
     }
     
     // ==================== Admin Commands ====================
