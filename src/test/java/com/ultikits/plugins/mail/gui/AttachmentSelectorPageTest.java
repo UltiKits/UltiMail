@@ -428,37 +428,137 @@ class AttachmentSelectorPageTest {
                 .isNull();
     }
 
+    /** Raw slot of the player's own inventory slot used by the shift-click tests. */
+    private int bottomRawSlot() {
+        return player.getOpenInventory().getTopInventory().getSize() + 4;
+    }
+
+    /** A real shift-click on {@code rawSlot} of the player's own (bottom) inventory, holding {@code stack}. */
+    private InventoryClickEvent shiftClickFromPlayerInventory(int rawSlot, ItemStack stack) {
+        InventoryView view = player.getOpenInventory();
+        view.setItem(rawSlot, stack);
+        return new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, rawSlot,
+                ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+    }
+
+    private ItemStack[] toolbarSnapshot(AttachmentSelectorPage onPage) {
+        ItemStack[] out = new ItemStack[9];
+        for (int i = 0; i < 9; i++) {
+            ItemStack item = onPage.getInventory().getItem(AttachmentSelectorPage.getContentSize() + i);
+            out[i] = item == null ? null : item.clone();
+        }
+        return out;
+    }
+
+    private java.util.List<String> drainMessages() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        String line;
+        while ((line = player.nextMessage()) != null) {
+            out.add(line);
+        }
+        return out;
+    }
+
     /**
-     * The checklist row for this page asserted that "a shift-click INTO the content area while it
-     * has room is deliberately allowed, not guarded". Measured here: it is cancelled, and not by
-     * anything this module wrote. A shift-click originating in the player's own inventory has its
-     * raw slot in the BOTTOM inventory, so {@link AttachmentSelectorPage#onClick} reports
-     * unhandled ({@code rawSlot >= 0 && rawSlot < CONTENT_SIZE} is false), and the library's
-     * {@code InvListener#onClick} then takes its {@code getSlot() != getRawSlot()} branch and
-     * cancels {@code MOVE_TO_OTHER_INVENTORY} outright.
-     * <p>
-     * The free content slot asserted first is the positive control: "while it has room" really did
-     * hold, and the click was cancelled anyway -- so this is not a full-page artefact.
+     * UltiKits/UltiMail#32: a shift-click from the sender's own inventory puts the whole stack into
+     * the first free content slot. The page moves it itself and the event stays cancelled, so the
+     * server's own shift-click (which could merge into the toolbar icons) never runs.
      */
     @Test
-    @DisplayName("从玩家背包 shift-click 放入内容区域会被取消（与文档此前的说法相反）")
-    void shiftClickPlacementFromThePlayerInventoryIsCancelled() {
-        InventoryView view = player.getOpenInventory();
-        assertThat(view.getTopInventory().firstEmpty())
-                .as("a content slot must really be free, so 'while it has room' holds and this test "
-                        + "is not measuring a full page")
-                .isBetween(0, AttachmentSelectorPage.getContentSize() - 1);
+    @DisplayName("Shift-click from the player's inventory places the stack in the first free content slot (UltiKits/UltiMail#32)")
+    void shiftClickFromThePlayerInventoryPlacesTheStackInTheFirstFreeContentSlot() {
+        int raw = bottomRawSlot();
+        ItemStack[] toolbarBefore = toolbarSnapshot(page);
+        InventoryClickEvent event = shiftClickFromPlayerInventory(raw, new ItemStack(Material.DIAMOND, 5));
 
-        InventoryClickEvent event = new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER,
-                view.getTopInventory().getSize() + 4, ClickType.SHIFT_LEFT,
-                InventoryAction.MOVE_TO_OTHER_INVENTORY);
         Bukkit.getPluginManager().callEvent(event);
 
-        assertThat(event.isCancelled())
-                .as("the GUI library cancels MOVE_TO_OTHER_INVENTORY for any bottom-inventory slot "
-                        + "this page does not handle, so shift-click placement does not work -- the "
-                        + "only way to place an attachment is a plain pick-up-and-place click")
+        assertThat(page.getInventory().getItem(0))
+                .as("the stack must land in the first free content slot")
+                .isEqualTo(new ItemStack(Material.DIAMOND, 5));
+        ItemStack left = player.getOpenInventory().getItem(raw);
+        assertThat(left == null || left.getType().isAir())
+                .as("the stack must have left the player's own slot")
                 .isTrue();
+        assertThat(event.isCancelled())
+                .as("the page moved the stack itself, so the server's own move must not run as well")
+                .isTrue();
+        assertThat(toolbarSnapshot(page)).as("the toolbar must be untouched").isEqualTo(toolbarBefore);
+    }
+
+    @Test
+    @DisplayName("With some content slots taken, shift-click uses the first free one (UltiKits/UltiMail#32)")
+    void shiftClickIntoAPartlyFullContentAreaUsesTheFirstFreeSlot() {
+        page.getInventory().setItem(0, new ItemStack(Material.STONE));
+        page.getInventory().setItem(1, new ItemStack(Material.DIRT));
+        int raw = bottomRawSlot();
+        InventoryClickEvent event = shiftClickFromPlayerInventory(raw, new ItemStack(Material.EMERALD, 3));
+
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(page.getInventory().getItem(2)).isEqualTo(new ItemStack(Material.EMERALD, 3));
+        assertThat(page.getInventory().getItem(0)).isEqualTo(new ItemStack(Material.STONE));
+        assertThat(page.getInventory().getItem(1)).isEqualTo(new ItemStack(Material.DIRT));
+    }
+
+    /**
+     * UltiKits/UltiMail#26 and #32: once the page holds as many attachments as it accepts, a
+     * shift-click is refused with a message and the stack stays in the player's inventory.
+     */
+    @Test
+    @DisplayName("At the attachment limit a shift-click is refused with a message (UltiKits/UltiMail#26, #32)")
+    void aShiftClickAtTheLimitIsRefusedWithAMessage() {
+        for (int i = 0; i < 27; i++) {
+            page.getInventory().setItem(i, new ItemStack(Material.STONE));
+        }
+        drainMessages();
+        int raw = bottomRawSlot();
+        InventoryClickEvent event = shiftClickFromPlayerInventory(raw, new ItemStack(Material.DIAMOND, 5));
+
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled()).isTrue();
+        assertThat(player.getOpenInventory().getItem(raw)).isEqualTo(new ItemStack(Material.DIAMOND, 5));
+        assertThat(page.getInventory().getItem(27)).as("nothing may be placed beyond the limit").isNull();
+        assertThat(drainMessages()).anySatisfy(m -> assertThat(m).contains("send_items_too_many"));
+    }
+
+    /**
+     * UltiKits/UltiMail#26: with a limit above the 45 content slots, a full content area refuses the
+     * shift-click with the same message -- the check is on the content area, never on the toolbar.
+     */
+    @Test
+    @DisplayName("A full content area refuses a shift-click with a message (UltiKits/UltiMail#26)")
+    void aShiftClickIntoAFullContentAreaIsRefusedWithAMessage() {
+        AttachmentSelectorPage roomy = new AttachmentSelectorPage(player, 64, plugin, items -> { }, () -> { });
+        // Opening a page over another closes the first; the GUI library's close handler hits the
+        // known Paper 1.21 IncompatibleClassChangeError described above, after the new page is shown.
+        try {
+            roomy.open();
+        } catch (RuntimeException | IncompatibleClassChangeError e) {
+            Throwable cause = e;
+            while (cause != null && !(cause instanceof IncompatibleClassChangeError)) {
+                cause = cause.getCause();
+            }
+            if (cause == null) {
+                throw e;
+            }
+        }
+        assertThat(player.getOpenInventory().getTopInventory()).isEqualTo(roomy.getInventory());
+        for (int i = 0; i < AttachmentSelectorPage.getContentSize(); i++) {
+            roomy.getInventory().setItem(i, new ItemStack(Material.STONE));
+        }
+        ItemStack[] toolbarBefore = toolbarSnapshot(roomy);
+        drainMessages();
+        int raw = bottomRawSlot();
+        InventoryClickEvent event = shiftClickFromPlayerInventory(raw, new ItemStack(Material.DIAMOND, 5));
+
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled()).isTrue();
+        assertThat(player.getOpenInventory().getItem(raw)).isEqualTo(new ItemStack(Material.DIAMOND, 5));
+        assertThat(toolbarSnapshot(roomy)).isEqualTo(toolbarBefore);
+        assertThat(drainMessages()).anySatisfy(m -> assertThat(m).contains("send_items_too_many"));
     }
 
     /**
@@ -481,26 +581,56 @@ class AttachmentSelectorPageTest {
                 .isFalse();
     }
 
+    /** UltiKits/UltiMail#32: a drag confined to the content area is accepted. */
     @Test
-    @DisplayName("拖拽放置到附件槽位仍会被取消（未修复的已知限制）")
-    void dragPlacementIntoContentAreaStillCancelled() {
-        int slot = 5; // inside the 0-44 content area
+    @DisplayName("A drag into the content area is accepted (UltiKits/UltiMail#32)")
+    void dragPlacementIntoContentAreaIsAccepted() {
         ItemStack diamond = new ItemStack(Material.DIAMOND);
+        java.util.Map<Integer, ItemStack> slots = new java.util.HashMap<>();
+        slots.put(5, diamond);
+        slots.put(6, diamond);
 
         InventoryDragEvent event = new InventoryDragEvent(player.getOpenInventory(),
-                null, diamond, false, Collections.singletonMap(slot, diamond));
-
+                null, new ItemStack(Material.DIAMOND, 2), false, slots);
         Bukkit.getPluginManager().callEvent(event);
 
-        // Gui.onDrag(InventoryDragEvent) defaults to `return false`, and AttachmentSelectorPage
-        // does not override it (unlike onClick), so InvListener's own default cancellation for an
-        // unhandled drag into the top inventory still applies -- a real mouse-drag placement
-        // remains fully blocked, exactly as before this PR's fix. This is the behaviour the class
-        // javadoc now documents: the class javadoc's former "players can drag items into the GUI"
-        // claim was inaccurate, and this test locks in the actual (unfixed) limitation rather
-        // than the aspirational one.
         assertThat(event.isCancelled())
-                .as("drag-placement into the content area is not supported and must stay cancelled")
-                .isTrue();
+                .as("a drag into free content slots must be let through")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("A drag that touches the toolbar stays cancelled (UltiKits/UltiMail#32)")
+    void aDragTouchingTheToolbarIsCancelled() {
+        ItemStack diamond = new ItemStack(Material.DIAMOND);
+        java.util.Map<Integer, ItemStack> slots = new java.util.HashMap<>();
+        slots.put(5, diamond);
+        slots.put(AttachmentSelectorPage.getContentSize() + 1, diamond);
+
+        InventoryDragEvent event = new InventoryDragEvent(player.getOpenInventory(),
+                null, new ItemStack(Material.DIAMOND, 2), false, slots);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("A drag that would take the page past its limit is refused with a message (UltiKits/UltiMail#32)")
+    void aDragPastTheLimitIsRefusedWithAMessage() {
+        for (int i = 0; i < 26; i++) {
+            page.getInventory().setItem(i, new ItemStack(Material.STONE));
+        }
+        drainMessages();
+        ItemStack diamond = new ItemStack(Material.DIAMOND);
+        java.util.Map<Integer, ItemStack> slots = new java.util.HashMap<>();
+        slots.put(30, diamond);
+        slots.put(31, diamond);
+
+        InventoryDragEvent event = new InventoryDragEvent(player.getOpenInventory(),
+                null, new ItemStack(Material.DIAMOND, 2), false, slots);
+        Bukkit.getPluginManager().callEvent(event);
+
+        assertThat(event.isCancelled()).isTrue();
+        assertThat(drainMessages()).anySatisfy(m -> assertThat(m).contains("send_items_too_many"));
     }
 }
