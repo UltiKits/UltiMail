@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.util.ItemReturns;
+import com.ultikits.plugins.mail.util.Placeholders;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.PostConstruct;
@@ -56,7 +57,6 @@ public class MailService {
 
     private static final Gson GSON = new Gson();
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>(){}.getType();
-    private static final java.util.regex.Pattern PLACEHOLDER = java.util.regex.Pattern.compile("\\{[A-Z]+}");
 
     /**
      * Initialize the mail service.
@@ -580,18 +580,7 @@ public class MailService {
      * token (a command or an error text can) is inserted as written and not expanded again.
      */
     private static String fillOnce(String template, String... namesAndValues) {
-        Map<String, String> values = new HashMap<>();
-        for (int i = 0; i + 1 < namesAndValues.length; i += 2) {
-            values.put(namesAndValues[i], namesAndValues[i + 1]);
-        }
-        java.util.regex.Matcher m = PLACEHOLDER.matcher(template);
-        StringBuffer out = new StringBuffer();
-        while (m.find()) {
-            String value = values.get(m.group());
-            m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(value != null ? value : m.group()));
-        }
-        m.appendTail(out);
-        return out.toString();
+        return Placeholders.fill(template, namesAndValues);
     }
     
     /**

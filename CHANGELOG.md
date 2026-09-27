@@ -33,6 +33,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A value inserted into a console line or a recall mail is shown exactly as written: every
+  placeholder of the line is filled in one pass. Before, a value containing a later placeholder was
+  rewritten — a server installed under a directory whose name contains `{KEY}` or `{REASON}` got a
+  removed-key warning naming a path that does not exist, a failed recall email whose error text
+  contained `{EMAIL}` named the wrong address, and a `recall.server-name` containing `{SENDER}` or
+  `{PLAYER}` had it replaced in recall mails and emails (UltiKits/UltiMail#37).
+- 控制台日志和召回邮件中插入的值按原样显示：同一行的所有占位符一次性替换。此前，值中若包含后面的占位符会被再次替换——
+  安装目录名含 `{KEY}` 或 `{REASON}` 的服务器，已移除配置键警告会给出不存在的路径；召回电子邮件发送失败时，错误文本含
+  `{EMAIL}` 会显示错误的地址；`recall.server-name` 含 `{SENDER}` 或 `{PLAYER}` 时会在召回邮件中被替换（UltiKits/UltiMail#37）。
+
 - A mail's attachment and its attached commands are now recorded as claimed before they are handed
   over, and a claim that cannot be recorded is refused instead of being repeatable. When the storage
   cannot record the claim, `/mail claim` and the mailbox window answer

@@ -1,13 +1,22 @@
 package com.ultikits.plugins.mail.util;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
- * Fills the {@code {NAME}} placeholders of a message line.
+ * Fills the {@code {NAME}} placeholders of a message line in one pass.
  * <p>
  * Every line of this module that inserts more than one value into a template goes through
- * {@link #fill}, so there is one place that decides how the values are inserted.
+ * {@link #fill}. Filling one placeholder after another with {@code String#replace} rewrote a value
+ * already inserted whenever that value itself contained a later placeholder's token: a server
+ * installed under a directory named {@code {KEY}} got a removed-key warning naming a path that does
+ * not exist (UltiKits/UltiMail#37). Here the template is scanned once, so each value is inserted
+ * exactly as written.
  *
  * @author wisdomme
- * @version 1.0.0
+ * @version 1.1.0
  */
 public final class Placeholders {
 
@@ -15,17 +24,31 @@ public final class Placeholders {
     }
 
     /**
-     * Fills {@code template}'s placeholders.
+     * Fills {@code template}'s placeholders in one pass; a value is never expanded again.
      *
      * @param template       the message line, for example from a language file
      * @param namesAndValues pairs of a placeholder token (such as {@code "{FILE}"}) and its value
-     * @return the filled line
+     * @return the filled line; a token with no value is left as written
      */
     public static String fill(String template, String... namesAndValues) {
-        String out = template;
+        Map<String, String> values = new HashMap<>();
+        StringBuilder alternatives = new StringBuilder();
         for (int i = 0; i + 1 < namesAndValues.length; i += 2) {
-            out = out.replace(namesAndValues[i], String.valueOf(namesAndValues[i + 1]));
+            values.put(namesAndValues[i], String.valueOf(namesAndValues[i + 1]));
+            if (alternatives.length() > 0) {
+                alternatives.append('|');
+            }
+            alternatives.append(Pattern.quote(namesAndValues[i]));
         }
-        return out;
+        if (values.isEmpty()) {
+            return template;
+        }
+        Matcher m = Pattern.compile(alternatives.toString()).matcher(template);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            m.appendReplacement(out, Matcher.quoteReplacement(values.get(m.group())));
+        }
+        m.appendTail(out);
+        return out.toString();
     }
 }
