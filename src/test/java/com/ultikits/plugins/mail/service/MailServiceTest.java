@@ -1495,7 +1495,8 @@ class MailServiceTest {
             // Should not throw
             mailService.deleteMail(mail, senderUuid);
 
-            assertThat(mail.isDeletedBySender()).isTrue();
+            // The deletion was not recorded, so the mail keeps the flags it had (UltiKits/UltiMail#38).
+            assertThat(mail.isDeletedBySender()).isFalse();
         }
     }
 
