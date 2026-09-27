@@ -396,6 +396,46 @@ class RecallCommandTest {
             }));
         }
 
+        /**
+         * UltiKits/UltiMail#37 sweep: the server name is inserted before {@code {SENDER}}, so a
+         * server name containing that token had it replaced by the sender's name.
+         */
+        @Test
+        @DisplayName("A server name containing {SENDER} is inserted as written (UltiKits/UltiMail#37)")
+        void aServerNameContainingTheSenderTokenStaysLiteral() throws Exception {
+            @SuppressWarnings("unchecked")
+            DataOperator<MailData> mailDataOperator = mock(DataOperator.class);
+            when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailDataOperator);
+            TestHelper.injectField(config, "serverName", "Srv{SENDER}");
+
+            Method method = RecallCommand.class.getDeclaredMethod(
+                "sendGameMail", String.class, String.class, String.class, String.class);
+            method.setAccessible(true); // NOPMD
+
+            method.invoke(recallCommand, "uuid-123", "TestPlayer", "TheAdmin", "Hello from {SERVER}, {SENDER}");
+
+            verify(mailDataOperator).insert(argThat(mail -> {
+                MailData m = (MailData) mail;
+                return "Hello from Srv{SENDER}, TheAdmin".equals(m.getContent());
+            }));
+        }
+
+        /**
+         * UltiKits/UltiMail#37: the failure's message is inserted before {@code {EMAIL}}, so an
+         * error text containing that token named an address the email was never sent to.
+         */
+        @Test
+        @DisplayName("An error text containing {EMAIL} is logged as written (UltiKits/UltiMail#37)")
+        void anErrorTextContainingTheEmailTokenStaysLiteral() {
+            String expected = com.ultikits.plugins.mail.i18n.CatalogueText.text("zh", "log_recall_email_failed")
+                    .replace("{EMAIL}", "a@example.org")
+                    .replace("{ERROR}", "boom {EMAIL}");
+
+            assertThat(recallCommand.emailFailureLine("a@example.org", "boom {EMAIL}"))
+                    .isEqualTo(expected)
+                    .contains("boom {EMAIL}");
+        }
+
         @Test
         @DisplayName("邮件内容应替换SENDER占位符")
         void shouldReplaceSenderPlaceholderInContent() throws Exception {

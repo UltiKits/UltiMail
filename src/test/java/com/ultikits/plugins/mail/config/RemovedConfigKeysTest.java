@@ -102,6 +102,27 @@ class RemovedConfigKeysTest {
         assertThat(warningsFor(file, "zh")).containsExactly(expected);
     }
 
+    /**
+     * UltiKits/UltiMail#37: the file's path is inserted before {@code {REASON}} and {@code {KEY}},
+     * so a server installed under a directory whose name contains either token used to have it
+     * rewritten, and the warning named a path that does not exist.
+     */
+    @Test
+    @DisplayName("A path containing a later placeholder's token is named exactly as it is (UltiKits/UltiMail#37)")
+    void aPathContainingAPlaceholderTokenIsNamedAsWritten(@TempDir File dir) throws IOException {
+        File odd = new File(dir, "srv-{KEY}-{REASON}");
+        assertThat(odd.mkdirs()).isTrue();
+        File file = write(odd, "mail-expire-days: 30\n");
+
+        List<String> warnings = warningsFor(file);
+
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.get(0))
+                .as("the warning must name the real file, token characters included")
+                .contains(file.getPath())
+                .contains("'mail-expire-days'");
+    }
+
     @Test
     @DisplayName("POSITIVE CONTROL: an upgraded server's file produces one warning per removed key, each naming the module, the file and the key")
     void warnsAboutEveryLeftoverKey(@TempDir File dir) throws IOException {
