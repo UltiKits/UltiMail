@@ -192,9 +192,22 @@ public class MailCommand extends BaseCommandExecutor {
             return;
         }
         
-        ItemStack[] items = mailService.claimItems(mail, player);
-        player.sendMessage(ChatColor.GREEN + i18n("claim_success")
-            .replace("{0}", String.valueOf(items.length)));
+        MailService.ClaimResult result = mailService.claimAttachment(mail, player);
+        switch (result.getStatus()) {
+            case CLAIMED:
+                player.sendMessage(ChatColor.GREEN + i18n("claim_success")
+                    .replace("{0}", String.valueOf(result.getItems().length)));
+                break;
+            case NOT_RECORDED:
+                // Nothing was handed over; the mail stays claimable (UltiKits/UltiMail#31).
+                player.sendMessage(ChatColor.RED + i18n("claim_not_recorded"));
+                break;
+            default:
+                // The checks above already answered "claimed" and "no attachment"; what is left is an
+                // attachment that could not be read, which has nothing to hand over either.
+                player.sendMessage(ChatColor.RED + i18n("claim_no_items"));
+                break;
+        }
     }
     
     @CmdMapping(format = "delete <index>")
