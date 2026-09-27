@@ -1,5 +1,6 @@
 package com.ultikits.plugins.mail;
 
+import com.ultikits.plugins.mail.config.ConfigTextDefaults;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.config.RemovedConfigKeys;
 import com.ultikits.plugins.mail.listener.AttachmentGUIListener;
@@ -8,6 +9,7 @@ import com.ultikits.ultitools.annotations.UltiToolsModule;
 import com.ultikits.ultitools.context.SimpleContainer;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * UltiMail - In-game mail system for Minecraft servers.
@@ -27,10 +29,11 @@ public class UltiMail extends UltiToolsPlugin {
 
     @Override
     public boolean registerSelf() {
-        getLogger().info(i18n("UltiMail 已启用！"));
+        getLogger().info(i18n("mail_enabled"));
         // Deleting a key from MailConfig does nothing to the operator's existing file, so tell them
         // about any key this version no longer reads (UltiKits/UltiMail#23).
         warnAboutRemovedConfigKeys();
+        writeConfigTextInServerLanguage();
         return true;
     }
 
@@ -43,15 +46,40 @@ public class UltiMail extends UltiToolsPlugin {
     @Override
     protected void onReload() {
         warnAboutRemovedConfigKeys();
+        writeConfigTextInServerLanguage();
+    }
+
+    /**
+     * Writes every text setting in {@code config/mail.yml} that is still built-in text in the server's
+     * language and saves the file once, so the file holds what the module shows; any other value is the
+     * operator's and is kept (maintainer decision 2026-09-25, UltiKits/UltiMail#21, UltiKits/UltiMail#22).
+     * Runs from {@link #registerSelf()} and from {@link #onReload()}, both after the module's language is
+     * loaded -- never from a configuration change listener, which the framework fires before it reloads
+     * the language. A value already in the current language matches nothing to replace, so a second
+     * start writes nothing.
+     * The text comes from this jar's own catalogue for the server's language, not from {@code i18n} (which
+     * reads the operator's extracted language file first), so every value written is one the next pass
+     * recognises (the text source decision of 2026-09-25).
+     */
+    private void writeConfigTextInServerLanguage() {
+        MailConfig config = getConfig(MailConfig.class);
+        if (config == null || !config.materializeText(
+                ConfigTextDefaults.jarLanguage(MailConfig.class, getLanguageCode())::getLocalizedText)) {
+            return;
+        }
+        try {
+            config.save();
+        } catch (IOException e) {
+            getLogger().warn(e, i18n("log_config_default_save_failed").replace("{FILE}", MailConfig.CONFIG_FILE));
+        }
     }
 
     private void warnAboutRemovedConfigKeys() {
         // Advisory only: nothing it throws may cost the module its enable or its reload.
         try {
-            RemovedConfigKeys.warnAboutLeftovers(operatorConfigFile(), getLogger()::warn);
+            RemovedConfigKeys.warnAboutLeftovers(operatorConfigFile(), getLogger()::warn, this);
         } catch (RuntimeException e) {
-            getLogger().warn(e, "Could not check " + MailConfig.CONFIG_FILE
-                    + " for removed configuration keys; the module continues without that check.");
+            getLogger().warn(e, i18n("log_removed_key_check_failed").replace("{FILE}", MailConfig.CONFIG_FILE));
         }
     }
 

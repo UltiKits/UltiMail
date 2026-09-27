@@ -255,6 +255,43 @@ class MailNotifyListenerTest {
             assertThat(text.toString()).contains("[notify_new_mail]");
         }
 
+        /**
+         * UltiKits/UltiMail#24: under language: en the join notification names the real unread count,
+         * shows exactly one pair of brackets, renders every colour code as colour, and its clickable
+         * part still runs /mail read.
+         */
+        @Test
+        @DisplayName("the join notification shows the count, one pair of brackets, no raw colour code, and still opens the inbox")
+        void notificationIsWellFormed() {
+            config.setNotifyOnJoin(true);
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(3);
+            when(mockPlugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+
+            listener.onPlayerJoin(new PlayerJoinEvent(player, "joined"));
+
+            ArgumentCaptor<net.md_5.bungee.api.chat.BaseComponent[]> sent =
+                    ArgumentCaptor.forClass(net.md_5.bungee.api.chat.BaseComponent[].class);
+            verify(mockSpigot).sendMessage(sent.capture());
+            StringBuilder plain = new StringBuilder();
+            boolean opensInbox = false;
+            for (net.md_5.bungee.api.chat.BaseComponent component : sent.getValue()) {
+                plain.append(component.toPlainText());
+                net.md_5.bungee.api.chat.ClickEvent click = component.getClickEvent();
+                if (click != null && "/mail read".equals(click.getValue())
+                        && component.toPlainText().contains("Click to view")) {
+                    opensInbox = true;
+                }
+            }
+            String text = plain.toString();
+            assertThat(text).contains("You have 3 unread mail(s)!");
+            assertThat(text).doesNotContain("{0}").doesNotContain("{COUNT}");
+            assertThat(text.chars().filter(c -> c == '[').count()).as("opening brackets in %s", text).isEqualTo(2);
+            assertThat(text.chars().filter(c -> c == ']').count()).as("closing brackets in %s", text).isEqualTo(2);
+            assertThat(text).contains("[Click to view]").doesNotContain("[[").doesNotContain("]]");
+            assertThat(text).doesNotContain("&").doesNotContain("\u00a7");
+            assertThat(opensInbox).as("the [Click to view] part runs /mail read").isTrue();
+        }
+
         @Test
         @DisplayName("通知消息应包含未读数量")
         void shouldIncludeUnreadCount() {

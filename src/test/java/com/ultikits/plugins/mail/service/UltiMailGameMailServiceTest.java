@@ -50,7 +50,18 @@ class UltiMailGameMailServiceTest {
         // Create service and inject
         gameMailService = new UltiMailGameMailService();
         injectField(gameMailService, "mailService", mockMailService);
+        // The notice comes from the module's language file (UltiKits/UltiMail#21): the module answers
+        // from the real zh catalogue. A tree whose service has no plugin field yet is left as it is,
+        // so the same tests run before and after the change.
+        plugin = TestHelper.pluginIn("zh");
+        try {
+            injectField(gameMailService, "plugin", plugin);
+        } catch (NoSuchFieldException absent) {
+            // the service does not read the language file yet
+        }
     }
+
+    private com.ultikits.ultitools.abstracts.UltiToolsPlugin plugin;
 
     @AfterEach
     void tearDown() {
@@ -258,6 +269,19 @@ class UltiMailGameMailServiceTest {
             gameMailService.notifyNewMail(player);
 
             verify(player, never()).sendMessage(any(String.class));
+        }
+
+        @Test
+        @DisplayName("under language: en the notice is the English catalogue text with the unread count (UltiKits/UltiMail#21)")
+        void noticeFollowsTheLanguageSetting() {
+            when(plugin.i18n(ArgumentMatchers.anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            when(mockMailService.getUnreadCount(playerUuid)).thenReturn(2);
+            String expected = org.bukkit.ChatColor.translateAlternateColorCodes('&',
+                    com.ultikits.plugins.mail.i18n.CatalogueText.text("en", "notify_unread_mail").replace("{COUNT}", "2"));
+
+            gameMailService.notifyNewMail(player);
+
+            verify(player).sendMessage(expected);
         }
 
         @Test

@@ -1,7 +1,7 @@
 /**
  * Synced from UltiTools-API v6.2.0
  * Source: UltiEssentials test utilities
- * Migrated onto org.mockbukkit.mockbukkit:mockbukkit-v1.21 during phase 14 (14-10).
+ * Migrated onto org.mockbukkit.mockbukkit:mockbukkit-v1.21 in 2026-09.
  */
 package com.ultikits.plugins.mail.utils;
 

@@ -160,11 +160,11 @@ class SendMailCommandTest {
         // constructed here -- its base class needs
         // a live obliviate-invs InventoryAPI/Bukkit inventory. The module's own
         // AttachmentSelectorPageTest exercises it under MockBukkit and is no longer
-        // @Disabled: Phase 14 migrated this module onto mockbukkit-v1.21 and re-enabled
-        // it. This class deliberately stays on pure Mockito and bootstraps no server,
-        // so a live inventory is still out of reach here. What IS in scope and in this
-        // class (not AttachmentSelectorPage's own gui/ code) is the pair of callback
-        // lambdas `sendMailWithItems` builds and hands to that constructor.
+        // @Disabled: the move onto mockbukkit-v1.21 re-enabled it. This class deliberately
+        // stays on pure Mockito and bootstraps no server, so a live inventory is still out of
+        // reach here. What IS in scope and in this class (not AttachmentSelectorPage's own gui/
+        // code) is the pair of callback lambdas `sendMailWithItems` builds and hands to that
+        // constructor.
         // mockConstruction replaces the constructor with a no-op mock and hands back
         // the exact arguments passed to it -- including those two lambdas -- so their
         // bodies can be invoked and pinned directly without ever running a line of the
@@ -249,6 +249,32 @@ class SendMailCommandTest {
     @Nested
     @DisplayName("帮助命令测试")
     class HelpTests {
+
+        @Test
+        @DisplayName("under language: en each /sendmail help line shows its command once (UltiKits/UltiMail#21's class)")
+        @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+        void helpLinesShowTheirCommandOnce() throws Exception {
+            java.lang.reflect.Field pluginField = SendMailCommand.class.getDeclaredField("ultiPlugin");
+            pluginField.setAccessible(true);
+            UltiToolsPlugin mockUltiPlugin = (UltiToolsPlugin) pluginField.get(command);
+            when(mockUltiPlugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
+            String attach = org.bukkit.ChatColor.YELLOW + "/sendmail <player> <subject> attach"
+                    + org.bukkit.ChatColor.WHITE + " - Send mail with attachment";
+
+            command.help(sender);
+
+            org.mockito.ArgumentCaptor<String> lines = org.mockito.ArgumentCaptor.forClass(String.class);
+            verify(sender, atLeast(1)).sendMessage(lines.capture());
+            assertThat(lines.getAllValues()).contains(attach);
+            for (String line : lines.getAllValues()) {
+                String plain = org.bukkit.ChatColor.stripColor(line);
+                int dash = plain.indexOf(" - ");
+                if (dash > 0) {
+                    assertThat(plain.substring(dash + 3)).as("line %s", plain)
+                            .doesNotContain(plain.substring(0, dash));
+                }
+            }
+        }
 
         @Test
         @DisplayName("帮助命令应该显示信息")
@@ -760,7 +786,7 @@ class SendMailCommandTest {
             // hit the "too many items" refusal.
             //
             // acceptInput used to hand the items back here itself. It no longer does, and that is
-            // the point of gate-1 BL-01's fix: there is exactly ONE place this module returns a
+            // the point of UltiKits/UltiMail#27's fix: there is exactly ONE place this module returns a
             // conversation's attachment -- the abandonment settlement -- and what routes an item
             // there is the conversation's custody record staying set. So what this test pins is
             // that a refusal does NOT clear custody and does NOT hand anything over itself; the
@@ -921,7 +947,7 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("会话以「优雅退出」结束但仍托管附件时也必须归还（BL-01 的直接回归守卫）")
+        @DisplayName("会话以「优雅退出」结束但仍托管附件时也必须归还（UltiKits/UltiMail#27 的直接回归守卫）")
         void shouldReturnItemsWhenAbandonedGracefullyWhileStillHoldingThem() {
             when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(false);
             ItemStack diamond = mock(ItemStack.class);

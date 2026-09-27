@@ -118,4 +118,23 @@ public final class TestHelper {
         } catch (Exception ignored) {
         }
     }
+
+    /**
+     * Binds a configuration entity to {@code plugin}, as the framework does when it loads the file.
+     */
+    @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+    public static void bindPlugin(com.ultikits.ultitools.abstracts.AbstractConfigEntity config,
+                                  UltiToolsPlugin plugin) throws Exception {
+        java.lang.reflect.Field field =
+                com.ultikits.ultitools.abstracts.AbstractConfigEntity.class.getDeclaredField("ultiToolsPlugin");
+        field.setAccessible(true);
+        field.set(config, plugin);
+    }
+
+    /** A plugin double whose {@code i18n} answers from the module's real {@code code} catalogue. */
+    public static UltiToolsPlugin pluginIn(String code) {
+        UltiToolsPlugin plugin = mockUltiToolsPlugin();
+        lenient().when(plugin.i18n(any(String.class))).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer(code));
+        return plugin;
+    }
 }

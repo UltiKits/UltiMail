@@ -1,5 +1,6 @@
 package com.ultikits.plugins.mail.service;
 
+import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.Service;
 import com.ultikits.ultitools.services.GameMailService;
@@ -25,6 +26,10 @@ public class UltiMailGameMailService implements GameMailService {
 
     @Autowired
     private MailService mailService;
+
+    /** The module, whose language file gives the unread-mail notice its text (UltiKits/UltiMail#21). */
+    @Autowired
+    private UltiToolsPlugin plugin;
 
     @Override
     public String getName() {
@@ -72,8 +77,8 @@ public class UltiMailGameMailService implements GameMailService {
     public void notifyNewMail(Player player) {
         int unread = getUnreadCount(player.getUniqueId());
         if (unread > 0) {
-            player.sendMessage(ChatColor.YELLOW + "[UltiMail] " + ChatColor.GREEN + 
-                "你有 " + unread + " 封未读邮件! 使用 /mail 查看");
+            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
+                plugin.i18n("notify_unread_mail").replace("{COUNT}", String.valueOf(unread))));
         }
     }
 }

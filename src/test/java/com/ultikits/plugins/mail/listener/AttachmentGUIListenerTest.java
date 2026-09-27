@@ -627,13 +627,12 @@ class AttachmentGUIListenerTest {
     class ModuleUnloadTests {
 
         /**
-         * Gate 1 MJ-02. The close and quit returns both need an event, and there is no event when
-         * this module is unloaded -- {@code /upm uninstall UltiMail} unregisters its listeners
-         * while the player stays online, and on shutdown
-         * {@code CraftServer#disablePlugins()} runs at bytecode offset 126 of
-         * {@code MinecraftServer#stopServer()} while {@code PlayerList#removeAll(Z)} is only
-         * reached at offset 199, so the listener is gone before any close event exists. Measured
-         * on the Paper 1.21.11 server jar this module targets.
+         * The close and quit returns both need an event, and there is no event when this module
+         * is unloaded -- {@code /upm uninstall UltiMail} unregisters its listeners while the
+         * player stays online, and on shutdown {@code CraftServer#disablePlugins()} runs at
+         * bytecode offset 126 of {@code MinecraftServer#stopServer()} while {@code
+         * PlayerList#removeAll(Z)} is only reached at offset 199, so the listener is gone before
+         * any close event exists. Measured on the Paper 1.21.11 server jar this module targets.
          * <p>
          * That same ordering is what makes the fix work rather than merely move the loss:
          * {@code PlayerList#saveAll()} sits at offset 188 and each removed player's own
@@ -666,6 +665,33 @@ class AttachmentGUIListenerTest {
                 }
             }
             return total;
+        }
+
+        /**
+         * When a selector cannot be closed during unload (in this test environment the library's
+         * close really fails, which is what drives the catch), the console warning is the language
+         * file's text in the server's language, through the module's logger. The plugin is
+         * injected only when the listener declares one, so this runs before and after the change.
+         */
+        @Test
+        @DisplayName("under language: zh the unload close-failure warning is the Chinese catalogue text")
+        void closeFailureWarningFollowsTheLanguageSetting() throws Exception {
+            UltiToolsPlugin zhPlugin = TestHelper.pluginIn("zh");
+            com.ultikits.ultitools.interfaces.impl.logger.PluginLogger logger = zhPlugin.getLogger();
+            try {
+                TestHelper.injectField(listener, "plugin", zhPlugin);
+            } catch (NoSuchFieldException absent) {
+                // the listener does not read the language file yet
+            }
+            String expected = com.ultikits.plugins.mail.i18n.CatalogueText.text("zh", "log_attachment_close_failed");
+            placeItemInContentArea(0, 3);
+
+            listener.returnEveryOpenSelector();
+
+            assertThat(countInPlayerInventory(PLACED) + countDroppedInWorld(PLACED))
+                    .as("control: the unload return still happened").isEqualTo(3);
+            org.mockito.Mockito.verify(logger, org.mockito.Mockito.atLeastOnce())
+                    .warn(org.mockito.ArgumentMatchers.any(Throwable.class), org.mockito.ArgumentMatchers.eq(expected));
         }
 
         @Test

@@ -36,7 +36,7 @@ import java.util.List;
 @CmdExecutor(
     alias = {"mail", "inbox"},
     permission = "ultimail.use",
-    description = "邮件系统"
+    description = "command_description_mail"
 )
 public class MailCommand extends BaseCommandExecutor {
     
@@ -279,19 +279,34 @@ public class MailCommand extends BaseCommandExecutor {
     @Override
     protected void handleHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + i18n("help_title"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail read" + ChatColor.WHITE + " - " + i18n("help_read"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail inbox" + ChatColor.WHITE + " - " + i18n("help_inbox"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail sent" + ChatColor.WHITE + " - " + i18n("help_sent"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail read <编号>" + ChatColor.WHITE + " - " + i18n("help_read_index"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail claim <编号>" + ChatColor.WHITE + " - " + i18n("help_claim"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail delete <编号>" + ChatColor.WHITE + " - " + i18n("help_delete"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail delall" + ChatColor.WHITE + " - " + i18n("help_delall"));
-        sender.sendMessage(ChatColor.YELLOW + "/mail delread" + ChatColor.WHITE + " - " + i18n("help_delread"));
-        sender.sendMessage(ChatColor.YELLOW + "/sendmail <玩家> <标题>" + ChatColor.WHITE + " - " + i18n("help_sendmail"));
-        
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_read")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_inbox")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_sent")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_sentgui")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_read_index")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_claim")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_delete")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_delall")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_delread")));
+        sender.sendMessage(helpLine(ChatColor.YELLOW, i18n("help_sendmail")));
+
         if (sender.hasPermission("ultimail.admin.sendall")) {
-            sender.sendMessage(ChatColor.RED + "/mail sendall <内容>" + ChatColor.WHITE + " - " + i18n("help_sendall"));
+            sender.sendMessage(helpLine(ChatColor.RED, i18n("help_sendall")));
         }
+    }
+
+    /**
+     * One help line from the language file's text, which already holds the whole line
+     * ("{@code /mail inbox - View inbox}"): the command part in {@code commandColour} and the
+     * description after the first {@code " - "} in white. The command is not written again in
+     * front of it: it used to be, so every line showed the command twice.
+     */
+    private String helpLine(ChatColor commandColour, String text) {
+        int dash = text.indexOf(" - ");
+        if (dash < 0) {
+            return commandColour + text;
+        }
+        return commandColour + text.substring(0, dash) + ChatColor.WHITE + text.substring(dash);
     }
     
     // ==================== Utilities ====================

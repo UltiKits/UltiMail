@@ -28,8 +28,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 /**
- * UltiKits/UltiMail#23, end to end (gate 1 WR-01). {@code UltiMailTest$RemovedKeyCheckWiring} stubs
- * {@code operatorConfigFile()}, so it proves the check is called but not that it reads the file the
+ * UltiKits/UltiMail#23, end to end. {@code UltiMailTest$RemovedKeyCheckWiring} stubs {@code
+ * operatorConfigFile()}, so it proves the check is called but not that it reads the file the
  * framework actually manages: {@code operatorConfigFile()} could resolve any other path, the check
  * would return silently on a file that does not exist, and every upgraded server would look exactly
  * like a clean one. Here nothing about the file is stubbed: the module's folder is a temp directory,
@@ -78,11 +78,19 @@ class UltiMailRemovedKeyEndToEndTest {
 
         UltiMail plugin = mock(UltiMail.class, CALLS_REAL_METHODS);
         setField(UltiToolsPlugin.class, plugin, "resourceFolderPath", moduleFolder.toString());
-        new ConfigManager().register(plugin, new MailConfig());
+        MailConfig config = new MailConfig();
+        new ConfigManager().register(plugin, config);
+        // The module reads its configuration through the framework's registry, which a unit test
+        // has no instance of; hand it the entity just registered.
+        doReturn(config).when(plugin).getConfig(MailConfig.class);
 
         logger = mock(PluginLogger.class);
         doReturn(logger).when(plugin).getLogger();
-        doAnswer(inv -> inv.getArgument(0)).when(plugin).i18n(anyString());
+        // The warnings come from the language file; answered from the real en catalogue.
+        doAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en")).when(plugin).i18n(anyString());
+        // The server's language, which the framework reads from its own config.yml; a unit test has no
+        // framework instance, so answer it directly.
+        doReturn("en").when(plugin).getLanguageCode();
         return plugin;
     }
 
