@@ -33,6 +33,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `/mail delete`, `/mail delall` and `/mail delread` no longer stop part-way when the storage cannot
+  record a deletion. `/mail delete` answers `The mail could not be deleted because the storage did not
+  record it. Please try again.`; `delall` and `delread` carry on with the other mails, report how many
+  they deleted, and add `<n> mail(s) could not be deleted because the storage did not record it; they
+  are still in your inbox. Please try again.` Before, a database error escaped the command after some
+  mails were already deleted and the player saw only a generic error (UltiKits/UltiMail#38).
+- 存储无法记录删除时，`/mail delete`、`/mail delall`、`/mail delread` 不再中途停止。`/mail delete` 会提示邮件没有被删除；
+  `delall` 和 `delread` 继续处理其余邮件，报告已删除的数量，并另行提示有多少封因存储未能记录而没有被删除、仍在收件箱中。
+  此前数据库错误会在部分邮件已删除后中断命令，玩家只看到通用错误（UltiKits/UltiMail#38）。
+
 - A value inserted into a console line or a recall mail is shown exactly as written: every
   placeholder of the line is filled in one pass. Before, a value containing a later placeholder was
   rewritten — a server installed under a directory whose name contains `{KEY}` or `{REASON}` got a

@@ -595,10 +595,21 @@ public class MailService {
 
     /**
      * Deletes a mail for {@code playerUuid} (soft delete; removed for good once both sides deleted it).
+     * <p>
+     * A write the storage cannot make is caught, logged with {@code log_update_mail_failed} and
+     * reported as not recorded, and the mail keeps the flags it had, so it is still there and can be
+     * deleted again. Both write failures are caught: {@code update}'s declared
+     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
+     * backends throw on any SQL error, which used to escape and abort {@code /mail delete},
+     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38).
+     * <p>
+     * 存储无法写入时记录日志并返回「未记录」，邮件保持原状态，不再抛出异常中断命令。
      *
-     * @return whether the deletion was recorded
+     * @return whether the deletion was recorded / 删除是否已记录
      */
     public boolean recordDeletion(MailData mail, UUID playerUuid) {
+        boolean wasDeletedBySender = mail.isDeletedBySender();
+        boolean wasDeletedByReceiver = mail.isDeletedByReceiver();
         if (mail.getSenderUuid().equals(playerUuid.toString())) {
             mail.setDeletedBySender(true);
         }
@@ -606,17 +617,32 @@ public class MailService {
             mail.setDeletedByReceiver(true);
         }
 
-        // If both deleted, really delete
+        String failure;
         if (mail.isDeletedBySender() && mail.isDeletedByReceiver()) {
-            dataOperator.delById(mail.getId());
+            // Both sides deleted it: remove it for good.
+            failure = deleteFailure(mail);
         } else {
-            try {
-                dataOperator.update(mail);
-            } catch (IllegalAccessException e) {
-                plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
-            }
+            failure = writeFailure(mail);
+        }
+        if (failure != null) {
+            mail.setDeletedBySender(wasDeletedBySender);
+            mail.setDeletedByReceiver(wasDeletedByReceiver);
+            plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", failure));
+            return false;
         }
         return true;
+    }
+
+    /**
+     * Removes a mail for good and returns {@code null}, or the failure's message instead of throwing.
+     */
+    private String deleteFailure(MailData mail) {
+        try {
+            dataOperator.delById(mail.getId());
+            return null;
+        } catch (DataAccessException e) {
+            return String.valueOf(e.getMessage());
+        }
     }
 
     /**

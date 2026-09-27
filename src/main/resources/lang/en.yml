@@ -54,6 +54,8 @@ delete_success: "Mail deleted!"
 delete_claim_first: "Please claim attachments before deleting!"
 delete_all_success: "All mails deleted!"
 delete_read_success: "All read mails deleted!"
+delete_not_recorded: "The mail could not be deleted because the storage did not record it. Please try again."
+delete_batch_not_recorded: "{COUNT} mail(s) could not be deleted because the storage did not record it; they are still in your inbox. Please try again."
 
 # === Broadcast Mail ===
 sendall_success: "Mail sent to all players!"
