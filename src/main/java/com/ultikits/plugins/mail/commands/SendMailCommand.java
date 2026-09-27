@@ -89,7 +89,9 @@ public class SendMailCommand extends BaseCommandExecutor {
             // Open multi-attachment GUI for admins
             sender.sendMessage(ChatColor.GREEN + i18n("attachment_gui_hint"));
             
-            int maxItems = 45; // Default max items for GUI
+            // The configured limit, which the send is checked against, so the selector's own
+            // shift-click and drag guard refuses exactly what the send would (UltiKits/UltiMail#32).
+            int maxItems = mailService.getConfig().getMaxItems();
             AttachmentSelectorPage gui = new AttachmentSelectorPage(sender, maxItems, ultiPlugin,
                 items -> {
                     // Filter out null items

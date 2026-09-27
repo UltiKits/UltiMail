@@ -38,11 +38,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   free attachment slot, and by dragging into the attachment area; before, both were refused and only a
   plain click placed an item. When the page already holds as many attachments as it accepts
   (`max-items`, at most 45), a shift-click or drag that would add one is refused with
-  `Too many attachments! Maximum <n> items` and the stack stays in your inventory. A drag into the
-  bottom button row is still refused (UltiKits/UltiMail#32). This check replaces a shift-click guard that
+  `Too many attachments! Maximum <n> items` and the stack stays in your inventory; for
+  `/sendmail … attach` that limit is now `max-items` (default 27), the same limit the send is checked
+  against, where the window used to allow 45. A drag into the bottom button row is still refused
+  (UltiKits/UltiMail#32). This check replaces a shift-click guard that
   could never fire (UltiKits/UltiMail#26).
 - 附件选择界面现在支持从自己背包 shift-click 放入物品（放进第一个空的附件格），也支持拖拽放入附件区域；此前两者都会被拒绝，
-  只能逐个点击放入。界面中的附件已达上限（`max-items`，最多 45）时，会增加附件的 shift-click 或拖拽会被拒绝并提示上限，物品留在背包中。
+  只能逐个点击放入。界面中的附件已达上限（`max-items`，最多 45）时，会增加附件的 shift-click 或拖拽会被拒绝并提示上限，物品留在背包中；
+  对 `/sendmail … attach` 而言，该上限现在就是 `max-items`（默认 27），与发送时的检查一致，此前窗口允许 45 个。
   拖入底部按钮行仍会被拒绝（UltiKits/UltiMail#32）。该检查取代了一个永远不会触发的 shift-click 守卫（UltiKits/UltiMail#26）。
 
 - `/mail delete`, `/mail delall` and `/mail delread` no longer stop part-way when the storage cannot
