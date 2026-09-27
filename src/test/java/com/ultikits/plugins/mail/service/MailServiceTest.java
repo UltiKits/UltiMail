@@ -1041,6 +1041,100 @@ class MailServiceTest {
         }
     }
 
+    // ==================== deletion storage failure (UltiKits/UltiMail#38) ====================
+
+    /**
+     * UltiKits/UltiMail#38: a deletion the storage cannot record is reported as not recorded, the
+     * mail keeps its flags, and a batch carries on with the rest instead of aborting part-way.
+     */
+    @Nested
+    @DisplayName("A deletion the storage cannot record (UltiKits/UltiMail#38)")
+    class DeleteStorageFailureTests {
+
+        @Test
+        @DisplayName("POSITIVE CONTROL: a recorded deletion reports recorded")
+        void aRecordedDeletionReportsRecorded() throws Exception {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+
+            assertThat(mailService.recordDeletion(mail, receiverUuid)).isTrue();
+            assertThat(mail.isDeletedByReceiver()).isTrue();
+        }
+
+        @Test
+        @DisplayName("A failed update is reported as not recorded, logged, and the mail keeps its flags")
+        void aFailedUpdateIsNotRecorded() throws Exception {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(any(MailData.class));
+
+            boolean recorded = mailService.recordDeletion(mail, receiverUuid);
+
+            assertThat(recorded).isFalse();
+            assertThat(mail.isDeletedByReceiver()).isFalse();
+            verify(TestHelper.getMockPlugin().getLogger()).error(contains("log_update_mail_failed"));
+        }
+
+        @Test
+        @DisplayName("A failed final delete is reported as not recorded, and the mail keeps its flags")
+        void aFailedFinalDeleteIsNotRecorded() {
+            MailData mail = createTestMail(senderUuid.toString(), "SenderPlayer",
+                receiverUuid.toString(), "ReceiverPlayer");
+            mail.setDeletedBySender(true);
+            mail.setId("123");
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).delById("123");
+
+            boolean recorded = mailService.recordDeletion(mail, receiverUuid);
+
+            assertThat(recorded).isFalse();
+            assertThat(mail.isDeletedByReceiver()).isFalse();
+            assertThat(mail.isDeletedBySender()).isTrue();
+        }
+
+        @Test
+        @DisplayName("The old deleteMail entry point no longer throws on a storage failure")
+        void deleteMailDoesNotThrow() throws Exception {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(any(MailData.class));
+
+            mailService.deleteMail(mail, receiverUuid);
+
+            assertThat(mail.isDeletedByReceiver()).isFalse();
+        }
+
+        @Test
+        @DisplayName("delall carries on past a failed mail and counts it as not recorded")
+        void deleteAllCountsFailuresAndCarriesOn() throws Exception {
+            MailData first = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            MailData second = createTestMail("s2", "sender2", receiverUuid.toString(), "ReceiverPlayer");
+            MailData third = createTestMail("s3", "sender3", receiverUuid.toString(), "ReceiverPlayer");
+            when(mockQueryBuilder.list()).thenReturn(new ArrayList<>(java.util.Arrays.asList(first, second, third)));
+            doNothing().doThrow(new DataAccessException("connection lost")).doNothing()
+                    .when(mockDataOperator).update(any(MailData.class));
+
+            MailService.DeleteResult result = mailService.deleteAllFromInbox(receiverUuid);
+
+            assertThat(result.getDeleted()).isEqualTo(2);
+            assertThat(result.getNotRecorded()).isEqualTo(1);
+            verify(mockDataOperator, times(3)).update(any(MailData.class));
+        }
+
+        @Test
+        @DisplayName("delread carries on past a failed mail and counts it as not recorded")
+        void deleteReadCountsFailuresAndCarriesOn() throws Exception {
+            MailData first = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            MailData second = createTestMail("s2", "sender2", receiverUuid.toString(), "ReceiverPlayer");
+            first.setRead(true);
+            second.setRead(true);
+            when(mockQueryBuilder.list()).thenReturn(new ArrayList<>(java.util.Arrays.asList(first, second)));
+            doThrow(new DataAccessException("connection lost")).doNothing()
+                    .when(mockDataOperator).update(any(MailData.class));
+
+            MailService.DeleteResult result = mailService.deleteReadFromInbox(receiverUuid);
+
+            assertThat(result.getDeleted()).isEqualTo(1);
+            assertThat(result.getNotRecorded()).isEqualTo(1);
+        }
+    }
+
     // ==================== getMail Tests ====================
 
     @Nested

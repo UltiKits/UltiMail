@@ -632,6 +632,60 @@ class MailCommandTest {
         }
     }
 
+    // ==================== deletion not recorded (UltiKits/UltiMail#38) ====================
+
+    @Nested
+    @DisplayName("A deletion the storage cannot record is reported (UltiKits/UltiMail#38)")
+    class DeleteNotRecordedTests {
+
+        @Test
+        @DisplayName("/mail delete says the mail was not deleted instead of claiming success")
+        void deleteReportsNotRecorded() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.recordDeletion(mail, playerUuid)).thenReturn(false);
+
+            mailCommand.delete(player, 1);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_not_recorded]")));
+            verify(player, never()).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_success]")));
+        }
+
+        @Test
+        @DisplayName("/mail delall reports how many were deleted and how many were not")
+        void deleteAllReportsBothCounts() {
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(2, 1));
+
+            mailCommand.deleteAll(player);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_all_success]") && msg.contains("(2)")));
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("/mail delread reports how many were deleted and how many were not")
+        void deleteReadReportsBothCounts() {
+            when(mockMailService.deleteReadFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(0, 3));
+
+            mailCommand.deleteRead(player);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_read_success]") && msg.contains("(0)")));
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("POSITIVE CONTROL: with every deletion recorded there is no not-recorded line")
+        void noNotRecordedLineWhenAllRecorded() {
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(2, 0));
+
+            mailCommand.deleteAll(player);
+
+            verify(player, never()).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
+        }
+    }
+
     // ==================== deleteRead Tests ====================
 
     @Nested
