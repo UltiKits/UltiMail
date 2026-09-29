@@ -33,6 +33,41 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The attachment selector (`/sendmail <player> <subject> attach` for a sender with
+  `ultimail.admin.multiattach`) now takes items by shift-click from your own inventory, into the first
+  free attachment slot, and by dragging into the attachment area; before, both were refused and only a
+  plain click placed an item. When the page already holds as many attachments as it accepts
+  (`max-items`, at most 45), a shift-click or drag that would add one is refused with
+  `Too many attachments! Maximum <n> items` and the stack stays in your inventory; for
+  `/sendmail … attach` that limit is now `max-items` (default 27), the same limit the send is checked
+  against, where the window used to allow 45. A drag into the bottom button row is still refused
+  (UltiKits/UltiMail#32). This check replaces a shift-click guard that
+  could never fire (UltiKits/UltiMail#26).
+- 附件选择界面现在支持从自己背包 shift-click 放入物品（放进第一个空的附件格），也支持拖拽放入附件区域；此前两者都会被拒绝，
+  只能逐个点击放入。界面中的附件已达上限（`max-items`，最多 45）时，会增加附件的 shift-click 或拖拽会被拒绝并提示上限，物品留在背包中；
+  对 `/sendmail … attach` 而言，该上限现在就是 `max-items`（默认 27），与发送时的检查一致，此前窗口允许 45 个。
+  拖入底部按钮行仍会被拒绝（UltiKits/UltiMail#32）。该检查取代了一个永远不会触发的 shift-click 守卫（UltiKits/UltiMail#26）。
+
+- `/mail delete`, `/mail delall` and `/mail delread` no longer stop part-way when the storage cannot
+  record a deletion. `/mail delete` answers `The mail could not be deleted because the storage did not
+  record it. Please try again.`; `delall` and `delread` carry on with the other mails, report how many
+  they deleted, and add `<n> mail(s) could not be deleted because the storage did not record it; they
+  are still in your inbox. Please try again.` Before, a database error escaped the command after some
+  mails were already deleted and the player saw only a generic error (UltiKits/UltiMail#38).
+- 存储无法记录删除时，`/mail delete`、`/mail delall`、`/mail delread` 不再中途停止。`/mail delete` 会提示邮件没有被删除；
+  `delall` 和 `delread` 继续处理其余邮件，报告已删除的数量，并另行提示有多少封因存储未能记录而没有被删除、仍在收件箱中。
+  此前数据库错误会在部分邮件已删除后中断命令，玩家只看到通用错误（UltiKits/UltiMail#38）。
+
+- A value inserted into a console line or a recall mail is shown exactly as written: every
+  placeholder of the line is filled in one pass. Before, a value containing a later placeholder was
+  rewritten — a server installed under a directory whose name contains `{KEY}` or `{REASON}` got a
+  removed-key warning naming a path that does not exist, a failed recall email whose error text
+  contained `{EMAIL}` named the wrong address, and a `recall.server-name` containing `{SENDER}` or
+  `{PLAYER}` had it replaced in recall mails and emails (UltiKits/UltiMail#37).
+- 控制台日志和召回邮件中插入的值按原样显示：同一行的所有占位符一次性替换。此前，值中若包含后面的占位符会被再次替换——
+  安装目录名含 `{KEY}` 或 `{REASON}` 的服务器，已移除配置键警告会给出不存在的路径；召回电子邮件发送失败时，错误文本含
+  `{EMAIL}` 会显示错误的地址；`recall.server-name` 含 `{SENDER}` 或 `{PLAYER}` 时会在召回邮件中被替换（UltiKits/UltiMail#37）。
+
 - A mail's attachment and its attached commands are now recorded as claimed before they are handed
   over, and a claim that cannot be recorded is refused instead of being repeatable. When the storage
   cannot record the claim, `/mail claim` and the mailbox window answer

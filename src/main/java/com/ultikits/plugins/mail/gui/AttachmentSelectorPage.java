@@ -8,7 +8,9 @@ import mc.obliviate.inventory.Icon;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -22,10 +24,10 @@ import java.util.function.Consumer;
 /**
  * GUI for selecting multiple attachments.
  * <p>
- * Players can click to place items into the GUI to add them as attachments. Drag-placement is
- * not supported: {@code Gui.onDrag(InventoryDragEvent)} defaults to cancelling any drag into this
- * page's own top inventory, and this class does not override it (see {@link #onClick} for the
- * click-side override that does exist).
+ * Players place items into the 45-slot content area to add them as attachments: by a plain click,
+ * by a shift-click from their own inventory (see {@link #onClick}) or by a drag (see
+ * {@link #onDrag}). The bottom toolbar row holds the confirm and cancel buttons and never takes an
+ * item.
  * This is only available for admins with ultimail.admin.sendall permission.
  *
  * @author wisdomme
@@ -73,32 +75,120 @@ public class AttachmentSelectorPage extends BaseConfirmationPage {
 
     /**
      * Lets a player freely place and remove items in the content area (slots {@code 0} to
-     * {@code CONTENT_SIZE - 1}).
+     * {@code CONTENT_SIZE - 1}), and places a stack shift-clicked from the player's own inventory.
      * <p>
-     * The cancellation this overrides is not applied by this class, nor by
-     * {@code BaseConfirmationPage}, nor by {@code BaseInventoryPage} -- none of the three
-     * overrides this hook, so the {@code obliviate-invs} library's own
-     * {@code mc.obliviate.inventory.Gui.onClick(InventoryClickEvent)} default (unconditionally
-     * {@code false}) runs instead. The library's {@code InvListener}, which reads that return
-     * value, cancels every click landing on a raw slot inside this page's own top inventory
-     * unless it is told the click was handled (verified by disassembling the shaded framework
-     * jar's {@code mc/obliviate/inventory/InvListener.class}: an unhandled click whose
-     * {@code getSlot() == getRawSlot()} is unconditionally cancelled). Returning {@code true}
-     * only for raw slots inside the content area is the narrowest override that lets placement
-     * through: the bottom toolbar (the confirm/cancel buttons, slots {@code CONTENT_SIZE} and
-     * up) is left unhandled here, so it keeps the same default cancellation it already had,
-     * protecting those icons from being picked up or swapped.
+     * The cancellation this overrides comes from the {@code obliviate-invs} library's
+     * {@code InvListener}, which reads this return value: a click it is told was handled is left
+     * alone, an unhandled click on a slot of this page's own top inventory is cancelled (protecting
+     * the toolbar icons), and an unhandled {@code MOVE_TO_OTHER_INVENTORY} from the player's own
+     * inventory is cancelled too (verified by disassembling the shaded framework jar's
+     * {@code mc/obliviate/inventory/InvListener.class}).
+     * <p>
+     * That last cancellation is why a shift-click used to place nothing at all (UltiKits/UltiMail#32).
+     * The page now moves such a stack itself -- into the first free content slot, never into the
+     * toolbar, and only while the page holds fewer than {@code min(maxItems, 45)} attachments -- and
+     * still reports the click unhandled, so the server's own shift-click (which would merge into
+     * any matching stack, toolbar icons included) never runs. A stack the page has no room for stays
+     * where it is and the player is told the limit; this replaces a guard on the attachment listener
+     * that could never fire (UltiKits/UltiMail#26).
      *
      * @param event the click event
      * @return {@code true} (handled -- do not cancel) for a content-area slot, {@code false}
-     *     (unhandled -- fall back to the library's own default) otherwise
+     *     (unhandled -- the library cancels it) otherwise
      */
     @Override
     public boolean onClick(InventoryClickEvent event) {
         int rawSlot = event.getRawSlot();
-        return rawSlot >= 0 && rawSlot < CONTENT_SIZE;
+        if (rawSlot >= 0 && rawSlot < CONTENT_SIZE) {
+            return true;
+        }
+        if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY && rawSlot >= getInventory().getSize()) {
+            event.setCancelled(true);
+            placeFromPlayerInventory(event);
+        }
+        return false;
     }
-    
+
+    /**
+     * Accepts a drag that lands only in the content area or the player's own inventory, as long as
+     * the content slots it newly fills keep the page within its limit; a drag touching the toolbar
+     * is refused (UltiKits/UltiMail#32).
+     *
+     * @param event the drag event
+     * @return {@code true} to let the drag through, {@code false} to have the library cancel it
+     */
+    @Override
+    public boolean onDrag(InventoryDragEvent event) {
+        int topSize = getInventory().getSize();
+        int newlyFilled = 0;
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= topSize) {
+                continue;
+            }
+            if (rawSlot < 0 || rawSlot >= CONTENT_SIZE) {
+                return false;
+            }
+            if (isEmpty(getInventory().getItem(rawSlot))) {
+                newlyFilled++;
+            }
+        }
+        if (newlyFilled > 0 && occupiedContentSlots() + newlyFilled > attachmentLimit()) {
+            tellLimit();
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Moves the shift-clicked stack into the first free content slot, or leaves it and tells the
+     * player the limit when the page holds as many attachments as it accepts.
+     */
+    private void placeFromPlayerInventory(InventoryClickEvent event) {
+        ItemStack moving = event.getCurrentItem();
+        if (isEmpty(moving)) {
+            return;
+        }
+        int target = -1;
+        if (occupiedContentSlots() < attachmentLimit()) {
+            for (int i = 0; i < CONTENT_SIZE; i++) {
+                if (isEmpty(getInventory().getItem(i))) {
+                    target = i;
+                    break;
+                }
+            }
+        }
+        if (target < 0) {
+            tellLimit();
+            return;
+        }
+        getInventory().setItem(target, moving.clone());
+        event.setCurrentItem(null);
+    }
+
+    /** How many attachments this page accepts: the configured limit, at most the content area. */
+    private int attachmentLimit() {
+        return Math.min(maxItems, CONTENT_SIZE);
+    }
+
+    private int occupiedContentSlots() {
+        int occupied = 0;
+        for (int i = 0; i < CONTENT_SIZE; i++) {
+            if (!isEmpty(getInventory().getItem(i))) {
+                occupied++;
+            }
+        }
+        return occupied;
+    }
+
+    private void tellLimit() {
+        player.sendMessage(ChatColor.YELLOW + i18n("send_items_too_many")
+                .replace("{0}", String.valueOf(attachmentLimit())));
+    }
+
+    private static boolean isEmpty(ItemStack item) {
+        return item == null || item.getType().isAir();
+    }
+
     @Override
     protected String getOkButtonName() {
         return ChatColor.GREEN + i18n("send_confirm_attachments");

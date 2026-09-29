@@ -227,7 +227,10 @@ public class MailCommand extends BaseCommandExecutor {
             return;
         }
         
-        mailService.deleteMail(mail, player.getUniqueId());
+        if (!mailService.recordDeletion(mail, player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + i18n("delete_not_recorded"));
+            return;
+        }
         player.sendMessage(ChatColor.GREEN + i18n("delete_success"));
     }
     
@@ -238,8 +241,9 @@ public class MailCommand extends BaseCommandExecutor {
      */
     @CmdMapping(format = "delall")
     public void deleteAll(@CmdSender Player player) {
-        int count = mailService.deleteAllByReceiver(player.getUniqueId());
-        player.sendMessage(ChatColor.GREEN + i18n("delete_all_success") + " (" + count + ")");
+        MailService.DeleteResult result = mailService.deleteAllFromInbox(player.getUniqueId());
+        player.sendMessage(ChatColor.GREEN + i18n("delete_all_success") + " (" + result.getDeleted() + ")");
+        reportNotRecorded(player, result);
     }
     
     /**
@@ -247,8 +251,20 @@ public class MailCommand extends BaseCommandExecutor {
      */
     @CmdMapping(format = "delread")
     public void deleteRead(@CmdSender Player player) {
-        int count = mailService.deleteReadByReceiver(player.getUniqueId());
-        player.sendMessage(ChatColor.GREEN + i18n("delete_read_success") + " (" + count + ")");
+        MailService.DeleteResult result = mailService.deleteReadFromInbox(player.getUniqueId());
+        player.sendMessage(ChatColor.GREEN + i18n("delete_read_success") + " (" + result.getDeleted() + ")");
+        reportNotRecorded(player, result);
+    }
+
+    /**
+     * Tells the player how many mails of a batch delete the storage could not record; those mails
+     * are still in the inbox (UltiKits/UltiMail#38).
+     */
+    private void reportNotRecorded(Player player, MailService.DeleteResult result) {
+        if (result.getNotRecorded() > 0) {
+            player.sendMessage(ChatColor.RED + i18n("delete_batch_not_recorded")
+                    .replace("{COUNT}", String.valueOf(result.getNotRecorded())));
+        }
     }
     
     // ==================== Admin Commands ====================

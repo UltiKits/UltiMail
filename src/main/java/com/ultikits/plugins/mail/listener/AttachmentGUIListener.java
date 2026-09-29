@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -29,9 +28,10 @@ import java.util.logging.Logger;
 /**
  * Listener for the attachment selector GUI.
  * <p>
- * Allows players to freely place and remove items in the content area, restricts actions in the
- * toolbar area, and gives back every item still sitting in the content area when the page is
- * closed without being confirmed.
+ * Keeps drags away from the toolbar area and gives back every item still sitting in the content
+ * area when the page is closed without being confirmed. Clicks, including shift-click placement,
+ * are decided by {@link AttachmentSelectorPage#onClick}; the click guard this listener used to carry
+ * could never fire and was removed (UltiKits/UltiMail#26).
  * <p>
  * <b>How the page is identified, and why it is not the inventory's holder.</b> Every handler here
  * used to ask {@code event.getInventory().getHolder() instanceof AttachmentSelectorPage}. That
@@ -83,32 +83,6 @@ public class AttachmentGUIListener implements Listener {
         AttachmentSelectorPage page = libraryPageBeingOpened(player, event.getInventory());
         if (page != null) {
             openPages.put(player.getUniqueId(), page);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (trackedPage(event.getWhoClicked(), event.getInventory()) == null) {
-            return;
-        }
-
-        int slot = event.getRawSlot();
-        int contentSize = AttachmentSelectorPage.getContentSize();
-
-        // Allow free item manipulation in content area (slots 0-44)
-        if (slot >= 0 && slot < contentSize) {
-            // Don't cancel - allow normal item operations
-            return;
-        }
-
-        // Bottom toolbar area (slots 45-53) - handled by base class onClick
-        // Cancel shift-click from player inventory to prevent putting items in toolbar
-        if (event.isShiftClick() && slot >= event.getView().getTopInventory().getSize()) {
-            // Check if target slot would be in toolbar
-            int targetSlot = event.getView().getTopInventory().firstEmpty();
-            if (targetSlot >= contentSize) {
-                event.setCancelled(true);
-            }
         }
     }
 

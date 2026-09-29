@@ -568,7 +568,7 @@ class MailCommandTest {
             mailCommand.delete(player, 1);
 
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_claim_first]")));
-            verify(mockMailService, never()).deleteMail(any(), any());
+            verify(mockMailService, never()).recordDeletion(any(), any());
         }
 
         @Test
@@ -578,10 +578,11 @@ class MailCommandTest {
             MailData mail = createTestMail("sender", false, false);
             mails.add(mail);
             when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.recordDeletion(mail, playerUuid)).thenReturn(true);
 
             mailCommand.delete(player, 1);
 
-            verify(mockMailService).deleteMail(mail, playerUuid);
+            verify(mockMailService).recordDeletion(mail, playerUuid);
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_success]")));
         }
 
@@ -594,10 +595,11 @@ class MailCommandTest {
             mail.setClaimed(true);
             mails.add(mail);
             when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.recordDeletion(mail, playerUuid)).thenReturn(true);
 
             mailCommand.delete(player, 1);
 
-            verify(mockMailService).deleteMail(mail, playerUuid);
+            verify(mockMailService).recordDeletion(mail, playerUuid);
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_success]")));
         }
     }
@@ -609,24 +611,78 @@ class MailCommandTest {
     class DeleteAllTests {
 
         @Test
-        @DisplayName("应该调用 deleteAllByReceiver")
+        @DisplayName("应该调用 deleteAllFromInbox")
         void shouldCallDeleteAll() {
-            when(mockMailService.deleteAllByReceiver(playerUuid)).thenReturn(5);
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(5, 0));
 
             mailCommand.deleteAll(player);
 
-            verify(mockMailService).deleteAllByReceiver(playerUuid);
+            verify(mockMailService).deleteAllFromInbox(playerUuid);
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("5")));
         }
 
         @Test
         @DisplayName("零删除时仍应显示消息")
         void shouldShowMessageForZeroDeletes() {
-            when(mockMailService.deleteAllByReceiver(playerUuid)).thenReturn(0);
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(0, 0));
 
             mailCommand.deleteAll(player);
 
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("0")));
+        }
+    }
+
+    // ==================== deletion not recorded (UltiKits/UltiMail#38) ====================
+
+    @Nested
+    @DisplayName("A deletion the storage cannot record is reported (UltiKits/UltiMail#38)")
+    class DeleteNotRecordedTests {
+
+        @Test
+        @DisplayName("/mail delete says the mail was not deleted instead of claiming success")
+        void deleteReportsNotRecorded() {
+            List<MailData> mails = new ArrayList<>();
+            MailData mail = createTestMail("sender", false, false);
+            mails.add(mail);
+            when(mockMailService.getInbox(playerUuid)).thenReturn(mails);
+            when(mockMailService.recordDeletion(mail, playerUuid)).thenReturn(false);
+
+            mailCommand.delete(player, 1);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_not_recorded]")));
+            verify(player, never()).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_success]")));
+        }
+
+        @Test
+        @DisplayName("/mail delall reports how many were deleted and how many were not")
+        void deleteAllReportsBothCounts() {
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(2, 1));
+
+            mailCommand.deleteAll(player);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_all_success]") && msg.contains("(2)")));
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("/mail delread reports how many were deleted and how many were not")
+        void deleteReadReportsBothCounts() {
+            when(mockMailService.deleteReadFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(0, 3));
+
+            mailCommand.deleteRead(player);
+
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_read_success]") && msg.contains("(0)")));
+            verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("POSITIVE CONTROL: with every deletion recorded there is no not-recorded line")
+        void noNotRecordedLineWhenAllRecorded() {
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(2, 0));
+
+            mailCommand.deleteAll(player);
+
+            verify(player, never()).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("[delete_batch_not_recorded]")));
         }
     }
 
@@ -637,13 +693,13 @@ class MailCommandTest {
     class DeleteReadTests {
 
         @Test
-        @DisplayName("应该调用 deleteReadByReceiver")
+        @DisplayName("应该调用 deleteReadFromInbox")
         void shouldCallDeleteRead() {
-            when(mockMailService.deleteReadByReceiver(playerUuid)).thenReturn(3);
+            when(mockMailService.deleteReadFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(3, 0));
 
             mailCommand.deleteRead(player);
 
-            verify(mockMailService).deleteReadByReceiver(playerUuid);
+            verify(mockMailService).deleteReadFromInbox(playerUuid);
             verify(player).sendMessage(ArgumentMatchers.<String>argThat(msg -> msg.contains("3")));
         }
     }
@@ -1019,21 +1075,21 @@ class MailCommandTest {
         @Test
         @DisplayName("deleteAll 应该使用正确的玩家UUID")
         void shouldCallDeleteAllWithCorrectUuid() {
-            when(mockMailService.deleteAllByReceiver(playerUuid)).thenReturn(0);
+            when(mockMailService.deleteAllFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(0, 0));
 
             mailCommand.deleteAll(player);
 
-            verify(mockMailService).deleteAllByReceiver(playerUuid);
+            verify(mockMailService).deleteAllFromInbox(playerUuid);
         }
 
         @Test
         @DisplayName("deleteRead 应该使用正确的玩家UUID")
         void shouldCallDeleteReadWithCorrectUuid() {
-            when(mockMailService.deleteReadByReceiver(playerUuid)).thenReturn(0);
+            when(mockMailService.deleteReadFromInbox(playerUuid)).thenReturn(new MailService.DeleteResult(0, 0));
 
             mailCommand.deleteRead(player);
 
-            verify(mockMailService).deleteReadByReceiver(playerUuid);
+            verify(mockMailService).deleteReadFromInbox(playerUuid);
         }
     }
 

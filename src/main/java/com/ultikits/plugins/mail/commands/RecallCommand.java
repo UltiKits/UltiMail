@@ -1,5 +1,6 @@
 package com.ultikits.plugins.mail.commands;
 
+import com.ultikits.plugins.mail.util.Placeholders;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.service.MailService;
@@ -153,9 +154,7 @@ public class RecallCommand extends BaseCommandExecutor {
                     emails.incrementAndGet();
                 } catch (Exception e) {
                     // Email failed, but game mail may have succeeded
-                    plugin.getLogger().warn(plugin.i18n("log_recall_email_failed")
-                        .replace("{ERROR}", String.valueOf(e.getMessage()))
-                        .replace("{EMAIL}", String.valueOf(playerInfo.email)));
+                    plugin.getLogger().warn(emailFailureLine(playerInfo.email, e.getMessage()));
                 }
             }
         }
@@ -171,9 +170,10 @@ public class RecallCommand extends BaseCommandExecutor {
         String content = customMessage != null ? customMessage : config.getRecallContent();
         
         // Replace placeholders
-        subject = subject.replace("{SERVER}", config.getServerName());
-        content = content.replace("{SERVER}", config.getServerName())
-                        .replace("{SENDER}", senderName);
+        subject = Placeholders.fill(subject, "{SERVER}", config.getServerName());
+        content = Placeholders.fill(content,
+                "{SERVER}", config.getServerName(),
+                "{SENDER}", senderName);
         
         MailData mail = new MailData();
         mail.setSenderUuid("SYSTEM");
@@ -197,12 +197,11 @@ public class RecallCommand extends BaseCommandExecutor {
             return;
         }
         
-        String subject = config.getRecallEmailSubject()
-            .replace("{SERVER}", config.getServerName());
-        String content = (customMessage != null ? customMessage : config.getRecallEmailContent())
-            .replace("{SERVER}", config.getServerName())
-            .replace("{PLAYER}", playerName)
-            .replace("{SENDER}", senderName);
+        String subject = Placeholders.fill(config.getRecallEmailSubject(), "{SERVER}", config.getServerName());
+        String content = Placeholders.fill(customMessage != null ? customMessage : config.getRecallEmailContent(),
+            "{SERVER}", config.getServerName(),
+            "{PLAYER}", playerName,
+            "{SENDER}", senderName);
         
         // Use reflection to load javax.mail classes to avoid ClassNotFoundException
         // when the library is not present
@@ -272,6 +271,19 @@ public class RecallCommand extends BaseCommandExecutor {
         }
     }
     
+    /**
+     * The console line for a recall email that could not be sent.
+     *
+     * @param email the address the email was sent to
+     * @param error the failure's message
+     * @return the filled {@code log_recall_email_failed} line
+     */
+    String emailFailureLine(String email, String error) {
+        return Placeholders.fill(plugin.i18n("log_recall_email_failed"),
+                "{ERROR}", String.valueOf(error),
+                "{EMAIL}", String.valueOf(email));
+    }
+
     /**
      * Get all registered players.
      * Tries to get from login plugin, falls back to mail data.

@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests for {@link AttachmentGUIListener}.
@@ -74,14 +75,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link EventPriority#LOWEST}, ahead of the library's throwing handler, which is why the
  * assertions still hold under MockBukkit's stricter dispatch.
  * <p>
- * <b>What the click tests can and cannot prove.</b> This listener's click handler has exactly one
- * cancelling branch, and that branch is the one {@code UltiKits/UltiMail#26} records as unreachable
- * (the toolbar row is fully occupied from the moment the page opens, so {@code firstEmpty()} can
- * never return a toolbar index). Whether that handler runs therefore has no observable effect on a
- * click at all, so {@code ClickHandlerTests} states exactly that -- it pins "this handler cancels
- * nothing" per branch rather than pretending to prove a guard that cannot fire. Cancellation inside
- * the page is the library's decision, taken from {@code AttachmentSelectorPage#onClick}'s return
- * value, and is covered by {@code AttachmentSelectorPageTest}.
+ * <b>Clicks.</b> This listener no longer handles clicks: its old click handler's only cancelling
+ * branch could never fire (UltiKits/UltiMail#26), and every click decision is taken by
+ * {@code AttachmentSelectorPage#onClick}, covered by {@code AttachmentSelectorPageTest}.
  */
 @DisplayName("AttachmentGUIListener 测试")
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
@@ -473,75 +469,24 @@ class AttachmentGUIListenerTest {
     }
 
     @Nested
-    @DisplayName("点击处理器的实际效果：什么都不取消")
+    @DisplayName("Clicks belong to the page, not to this listener (UltiKits/UltiMail#26)")
     class ClickHandlerTests {
 
         /**
-         * These four cases characterise what the click handler actually does now that it is
-         * reachable at all: nothing observable. Its only cancelling branch is the one
-         * {@code UltiKits/UltiMail#26} records as unreachable -- the toolbar row is fully occupied
-         * from the moment the page opens (verified: {@code Gui#addItem} writes each icon straight
-         * into the inventory), so {@code firstEmpty()} can only ever return a content-area index
-         * or {@code -1}, never a toolbar index. The handler is invoked directly here, because what
-         * is being pinned is that IT touches nothing; cancellation inside the page is the library's
-         * decision from {@code AttachmentSelectorPage#onClick} and is covered by
-         * {@code AttachmentSelectorPageTest}. When #26 is fixed, the third case below is the one
-         * that must change.
+         * The click handler this listener used to carry had one cancelling branch, and it could
+         * never fire: the toolbar row is fully occupied from the moment the page opens, so
+         * {@code firstEmpty()} never returned a toolbar index (UltiKits/UltiMail#26). Every click
+         * decision now sits in {@code AttachmentSelectorPage#onClick}, which also places a
+         * shift-clicked stack and refuses one the content area has no room for; that behaviour is
+         * covered by {@code AttachmentSelectorPageTest}. This pins that the dead handler is gone
+         * rather than left beside the real one.
          */
-        private InventoryClickEvent clickEvent(int rawSlot, ClickType type, InventoryAction action) {
-            return new InventoryClickEvent(view, InventoryType.SlotType.CONTAINER, rawSlot, type,
-                    action);
-        }
-
         @Test
-        @DisplayName("内容区域的点击不被本处理器取消")
-        void aContentAreaClickIsLeftAlone() {
-            InventoryClickEvent event = clickEvent(0, ClickType.LEFT, InventoryAction.PLACE_ALL);
-            listener.onInventoryClick(event);
-            assertThat(event.isCancelled()).isFalse();
-        }
-
-        @Test
-        @DisplayName("工具栏槽位的普通点击不被本处理器取消（由库自行取消）")
-        void aPlainToolbarClickIsLeftAloneByThisHandler() {
-            InventoryClickEvent event = clickEvent(okButtonSlot(), ClickType.LEFT,
-                    InventoryAction.PICKUP_ALL);
-            listener.onInventoryClick(event);
-            assertThat(event.isCancelled())
-                    .as("the toolbar is protected by the library's own default, not by this handler")
-                    .isFalse();
-        }
-
-        @Test
-        @DisplayName("从玩家背包 shift-click：#26 记录的守卫条件仍无法成立")
-        void aShiftClickFromThePlayerInventoryStillCannotTripTheToolbarGuard() {
-            InventoryClickEvent event = clickEvent(view.getTopInventory().getSize() + 5,
-                    ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
-
-            assertThat(view.getTopInventory().firstEmpty())
-                    .as("the guard reads firstEmpty(), and with the toolbar pre-filled and the "
-                            + "content area empty it can only answer with a content-area index")
-                    .isBetween(0, AttachmentSelectorPage.getContentSize() - 1);
-
-            listener.onInventoryClick(event);
-
-            assertThat(event.isCancelled())
-                    .as("UltiKits/UltiMail#26: this guard cannot fire, and this fix does not "
-                            + "change that")
-                    .isFalse();
-        }
-
-        @Test
-        @DisplayName("另一个容器中的点击被本处理器忽略")
-        void aClickInAnotherInventoryIsIgnored() {
-            Inventory chest = Bukkit.createInventory(null, 27, "a chest");
-            InventoryClickEvent event = new InventoryClickEvent(
-                    new PlayerInventoryViewMock(player, chest), InventoryType.SlotType.CONTAINER,
-                    5, ClickType.LEFT, InventoryAction.PLACE_ALL);
-
-            listener.onInventoryClick(event);
-
-            assertThat(event.isCancelled()).isFalse();
+        @DisplayName("The listener has no click handler of its own")
+        void theListenerLeavesClickHandlingToThePage() {
+            assertThatThrownBy(() -> AttachmentGUIListener.class
+                    .getMethod("onInventoryClick", InventoryClickEvent.class))
+                    .isInstanceOf(NoSuchMethodException.class);
         }
     }
 
@@ -790,13 +735,10 @@ class AttachmentGUIListenerTest {
         }
 
         @Test
-        @DisplayName("四个容器事件处理方法都应带 @EventHandler")
+        @DisplayName("三个容器事件处理方法都应带 @EventHandler")
         void everyInventoryHandlerIsAnEventHandler() throws Exception {
             assertThat(AttachmentGUIListener.class
                     .getMethod("onInventoryOpen", InventoryOpenEvent.class)
-                    .isAnnotationPresent(org.bukkit.event.EventHandler.class)).isTrue();
-            assertThat(AttachmentGUIListener.class
-                    .getMethod("onInventoryClick", InventoryClickEvent.class)
                     .isAnnotationPresent(org.bukkit.event.EventHandler.class)).isTrue();
             assertThat(AttachmentGUIListener.class
                     .getMethod("onInventoryDrag", InventoryDragEvent.class)
@@ -804,15 +746,6 @@ class AttachmentGUIListenerTest {
             assertThat(AttachmentGUIListener.class
                     .getMethod("onInventoryClose", InventoryCloseEvent.class)
                     .isAnnotationPresent(org.bukkit.event.EventHandler.class)).isTrue();
-        }
-
-        @Test
-        @DisplayName("onInventoryClick 应该使用 HIGH 优先级")
-        void shouldUseHighPriorityForClick() throws Exception {
-            assertThat(AttachmentGUIListener.class
-                    .getMethod("onInventoryClick", InventoryClickEvent.class)
-                    .getAnnotation(org.bukkit.event.EventHandler.class)
-                    .priority()).isEqualTo(EventPriority.HIGH);
         }
 
         @Test

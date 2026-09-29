@@ -173,6 +173,8 @@ class SendMailCommandTest {
 
         private void openAdminAttachmentSelector() {
             when(sender.hasPermission("ultimail.admin.multiattach")).thenReturn(true);
+            MailConfig config = new MailConfig();
+            lenient().when(mockMailService.getConfig()).thenReturn(config);
             capturedArgs = new ArrayList<>();
             try (MockedConstruction<AttachmentSelectorPage> mocked = mockConstruction(
                     AttachmentSelectorPage.class,
@@ -189,6 +191,21 @@ class SendMailCommandTest {
 
         private Runnable onCancelCallback() {
             return (Runnable) capturedArgs.get(4);
+        }
+
+        /**
+         * The selector's limit is the configured {@code max-items}, the same limit the send is
+         * checked against, so its shift-click and drag guard refuses exactly what the send would.
+         * It used to be a hard-coded 45: on the default 27 the page accepted attachments 28 to 45
+         * that the send then rejected, handing everything back.
+         */
+        @Test
+        @DisplayName("the admin attachment selector takes its limit from max-items")
+        void selectorLimitIsTheConfiguredMaxItems() {
+            openAdminAttachmentSelector();
+
+            assertThat(capturedArgs.get(1)).isEqualTo(new MailConfig().getMaxItems());
+            assertThat(new MailConfig().getMaxItems()).as("POSITIVE CONTROL: the default differs from 45").isNotEqualTo(45);
         }
 
         @Test

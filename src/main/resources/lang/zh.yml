@@ -54,6 +54,8 @@ delete_success: "邮件已删除！"
 delete_claim_first: "请先领取附件再删除邮件！"
 delete_all_success: "已删除所有邮件！"
 delete_read_success: "已删除所有已读邮件！"
+delete_not_recorded: "存储未能记录删除，邮件没有被删除。请重试。"
+delete_batch_not_recorded: "有 {COUNT} 封邮件因存储未能记录而没有被删除，它们仍在收件箱中。请重试。"
 
 # === 群发邮件 ===
 sendall_success: "已向所有玩家发送邮件！"

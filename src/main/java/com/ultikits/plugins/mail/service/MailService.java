@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken;
 import com.ultikits.plugins.mail.config.MailConfig;
 import com.ultikits.plugins.mail.entity.MailData;
 import com.ultikits.plugins.mail.util.ItemReturns;
+import com.ultikits.plugins.mail.util.Placeholders;
 import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.Autowired;
 import com.ultikits.ultitools.annotations.PostConstruct;
@@ -56,7 +57,6 @@ public class MailService {
 
     private static final Gson GSON = new Gson();
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>(){}.getType();
-    private static final java.util.regex.Pattern PLACEHOLDER = java.util.regex.Pattern.compile("\\{[A-Z]+}");
 
     /**
      * Initialize the mail service.
@@ -580,88 +580,153 @@ public class MailService {
      * token (a command or an error text can) is inserted as written and not expanded again.
      */
     private static String fillOnce(String template, String... namesAndValues) {
-        Map<String, String> values = new HashMap<>();
-        for (int i = 0; i + 1 < namesAndValues.length; i += 2) {
-            values.put(namesAndValues[i], namesAndValues[i + 1]);
-        }
-        java.util.regex.Matcher m = PLACEHOLDER.matcher(template);
-        StringBuffer out = new StringBuffer();
-        while (m.find()) {
-            String value = values.get(m.group());
-            m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(value != null ? value : m.group()));
-        }
-        m.appendTail(out);
-        return out.toString();
+        return Placeholders.fill(template, namesAndValues);
     }
     
     /**
      * Delete mail (soft delete).
+     * <p>
+     * Kept with its original signature for plugins compiled against an earlier version; call
+     * {@link #recordDeletion} to learn whether the deletion was recorded.
      */
     public void deleteMail(MailData mail, UUID playerUuid) {
+        recordDeletion(mail, playerUuid);
+    }
+
+    /**
+     * Deletes a mail for {@code playerUuid} (soft delete; removed for good once both sides deleted it).
+     * <p>
+     * A write the storage cannot make is caught, logged with {@code log_update_mail_failed} and
+     * reported as not recorded, and the mail keeps the flags it had, so it is still there and can be
+     * deleted again. Both write failures are caught: {@code update}'s declared
+     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
+     * backends throw on any SQL error, which used to escape and abort {@code /mail delete},
+     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38).
+     * <p>
+     * 存储无法写入时记录日志并返回「未记录」，邮件保持原状态，不再抛出异常中断命令。
+     *
+     * @return whether the deletion was recorded / 删除是否已记录
+     */
+    public boolean recordDeletion(MailData mail, UUID playerUuid) {
+        boolean wasDeletedBySender = mail.isDeletedBySender();
+        boolean wasDeletedByReceiver = mail.isDeletedByReceiver();
         if (mail.getSenderUuid().equals(playerUuid.toString())) {
             mail.setDeletedBySender(true);
         }
         if (mail.getReceiverUuid().equals(playerUuid.toString())) {
             mail.setDeletedByReceiver(true);
         }
-        
-        // If both deleted, really delete
+
+        String failure;
         if (mail.isDeletedBySender() && mail.isDeletedByReceiver()) {
-            dataOperator.delById(mail.getId());
+            // Both sides deleted it: remove it for good.
+            failure = deleteFailure(mail);
         } else {
-            try {
-                dataOperator.update(mail);
-            } catch (IllegalAccessException e) {
-                plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
-            }
+            failure = writeFailure(mail);
+        }
+        if (failure != null) {
+            mail.setDeletedBySender(wasDeletedBySender);
+            mail.setDeletedByReceiver(wasDeletedByReceiver);
+            plugin.getLogger().error(plugin.i18n("log_update_mail_failed").replace("{ERROR}", failure));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Removes a mail for good and returns {@code null}, or the failure's message instead of throwing.
+     */
+    private String deleteFailure(MailData mail) {
+        try {
+            dataOperator.delById(mail.getId());
+            return null;
+        } catch (DataAccessException e) {
+            return String.valueOf(e.getMessage());
         }
     }
-    
+
+    /**
+     * What a batch delete did: how many mails it deleted, and how many it could not record.
+     */
+    public static final class DeleteResult {
+        private final int deleted;
+        private final int notRecorded;
+
+        public DeleteResult(int deleted, int notRecorded) {
+            this.deleted = deleted;
+            this.notRecorded = notRecorded;
+        }
+
+        /** @return the number of mails deleted */
+        public int getDeleted() {
+            return deleted;
+        }
+
+        /** @return the number of mails whose deletion could not be recorded; they are still there */
+        public int getNotRecorded() {
+            return notRecorded;
+        }
+    }
+
     /**
      * Delete all mails for a player (receiver side).
-     * 
+     *
      * @return number of mails deleted
      */
     public int deleteAllByReceiver(UUID playerUuid) {
-        List<MailData> mails = getInbox(playerUuid);
-        int count = 0;
-        
-        for (MailData mail : mails) {
-            // Skip if has unclaimed items
-            if (mail.hasItems() && !mail.isClaimed()) {
-                continue;
-            }
-            deleteMail(mail, playerUuid);
-            count++;
-        }
-        
-        return count;
+        return deleteAllFromInbox(playerUuid).getDeleted();
     }
-    
+
+    /**
+     * Deletes every inbox mail of a player that has no unclaimed attachment.
+     *
+     * @return how many were deleted and how many could not be recorded
+     */
+    public DeleteResult deleteAllFromInbox(UUID playerUuid) {
+        return deleteFromInbox(playerUuid, false);
+    }
+
     /**
      * Delete all read mails for a player (receiver side).
-     * 
+     *
      * @return number of mails deleted
      */
     public int deleteReadByReceiver(UUID playerUuid) {
+        return deleteReadFromInbox(playerUuid).getDeleted();
+    }
+
+    /**
+     * Deletes every read inbox mail of a player that has no unclaimed attachment.
+     *
+     * @return how many were deleted and how many could not be recorded
+     */
+    public DeleteResult deleteReadFromInbox(UUID playerUuid) {
+        return deleteFromInbox(playerUuid, true);
+    }
+
+    private DeleteResult deleteFromInbox(UUID playerUuid, boolean readOnly) {
         List<MailData> mails = getInbox(playerUuid);
-        int count = 0;
-        
+        int deleted = 0;
+        int notRecorded = 0;
+
         for (MailData mail : mails) {
-            if (!mail.isRead()) {
+            if (readOnly && !mail.isRead()) {
                 continue;
             }
             // Skip if has unclaimed items
             if (mail.hasItems() && !mail.isClaimed()) {
                 continue;
             }
-            deleteMail(mail, playerUuid);
-            count++;
+            if (recordDeletion(mail, playerUuid)) {
+                deleted++;
+            } else {
+                notRecorded++;
+            }
         }
-        
-        return count;
+
+        return new DeleteResult(deleted, notRecorded);
     }
-    
+
     /**
      * Get mail by ID.
      */
