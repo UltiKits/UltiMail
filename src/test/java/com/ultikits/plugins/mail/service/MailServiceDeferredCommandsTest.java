@@ -67,6 +67,7 @@ class MailServiceDeferredCommandsTest {
         logger = plugin.getLogger();
         operator = mock(DataOperator.class);
         when(plugin.getDataOperator(MailData.class)).thenReturn(operator);
+        when(operator.updateCounted(any(MailData.class))).thenReturn(1);
         reader = mock(Player.class);
         when(reader.getName()).thenReturn("Reader");
         scheduler = mock(BukkitScheduler.class);
@@ -109,7 +110,7 @@ class MailServiceDeferredCommandsTest {
         service.executeMailCommandsDeferred(reader, mail);
 
         assertThat(mail.isCommandsExecuted()).isTrue();
-        verify(operator).update(mail);
+        verify(operator).updateCounted(mail);
         verify(reader, never()).performCommand(anyString());
 
         scheduledTask().run();
@@ -136,7 +137,21 @@ class MailServiceDeferredCommandsTest {
     @Test
     @DisplayName("a refused marker write runs nothing and schedules nothing, so reading the mail again retries")
     void refusedWriteSchedulesNothing() throws Exception {
-        doThrow(new DataAccessException("connection lost")).when(operator).update(any(MailData.class));
+        doThrow(new DataAccessException("connection lost")).when(operator).updateCounted(any(MailData.class));
+        MailData mail = mailWith("[\"give %player% diamond 1\"]");
+
+        service.executeMailCommandsDeferred(reader, mail);
+
+        assertThat(mail.isCommandsExecuted()).isFalse();
+        verify(scheduler, never()).runTask(any(Plugin.class), any(Runnable.class));
+        verify(reader, never()).performCommand(anyString());
+        verify(reader).sendMessage(contains("mail_commands_not_recorded"));
+    }
+
+    @Test
+    @DisplayName("a stored row that is gone (no row matched the write) schedules nothing and runs nothing, like a refused write (UltiMail#44)")
+    void goneRowSchedulesNothing() throws Exception {
+        when(operator.updateCounted(any(MailData.class))).thenReturn(0);
         MailData mail = mailWith("[\"give %player% diamond 1\"]");
 
         service.executeMailCommandsDeferred(reader, mail);
@@ -188,7 +203,7 @@ class MailServiceDeferredCommandsTest {
         assertThat(mail.isCommandsExecuted()).as("a later read must be able to run the commands").isFalse();
         verify(logger).error(contains("log_mail_commands_failed"));
         verify(reader, never()).performCommand(anyString());
-        verify(operator, times(2)).update(mail);
+        verify(operator, times(2)).updateCounted(mail);
     }
 
     @Test
@@ -204,7 +219,7 @@ class MailServiceDeferredCommandsTest {
         service.executeMailCommandsDeferred(reader, done);
 
         verify(scheduler, never()).runTask(any(Plugin.class), any(Runnable.class));
-        verify(operator, never()).update(any(MailData.class));
+        verify(operator, never()).updateCounted(any(MailData.class));
     }
 
     @Test

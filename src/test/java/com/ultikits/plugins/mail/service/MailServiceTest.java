@@ -80,6 +80,8 @@ class MailServiceTest {
         lenient().when(mockDataOperator.query()).thenReturn(mockQueryBuilder);
         lenient().when(mockQueryBuilder.where(anyString())).thenReturn(mockQueryBuilder);
         lenient().when(mockQueryBuilder.eq(any())).thenReturn(mockQueryBuilder);
+        // A write that matched its stored row (UltiTools-Reborn#558: updateCounted returns the row count).
+        lenient().when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(1);
 
         // Use real MailConfig with default values
         config = new MailConfig();
@@ -658,6 +660,73 @@ class MailServiceTest {
         }
     }
 
+    // ==================== a write whose stored row is gone (UltiKits/UltiMail#44) ====================
+
+    /**
+     * UltiTools-Reborn#558: an update of a row that no longer exists writes nothing and returns normally; only
+     * {@code updateCounted} says so, with {@code 0}. Every state write of this module goes through one place, and
+     * its callers used to take that no-op as a committed write, so a claim handed over an attachment from a mail an
+     * administrator had removed. A {@code 0} now takes the failure path a thrown write takes.
+     */
+    @Nested
+    @DisplayName("a mail state write whose stored row is gone is a failed write (UltiMail#44)")
+    class RowGoneTests {
+
+        @BeforeEach
+        void rowIsGone() {
+            when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(0);
+        }
+
+        @Test
+        @DisplayName("recording a deletion reports not recorded, logs it, and the mail keeps the flags it had")
+        void aDeletionOfAGoneRowIsNotRecorded() {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+
+            boolean recorded = mailService.recordDeletion(mail, receiverUuid);
+
+            assertThat(recorded).isFalse();
+            assertThat(mail.isDeletedByReceiver()).isFalse();
+            verify(TestHelper.getMockPlugin().getLogger()).error(contains("log_update_mail_failed"));
+        }
+
+        @Test
+        @DisplayName("marking a mail read logs the failed write and the read still goes on")
+        void markAsReadOfAGoneRowIsLogged() {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+
+            mailService.markAsRead(mail);
+
+            assertThat(mail.isRead()).isTrue();
+            verify(TestHelper.getMockPlugin().getLogger()).error(contains("log_mark_read_failed"));
+        }
+
+        @Test
+        @DisplayName("attached commands are not run: the marker was not recorded, the reader is told, the flag is restored")
+        void commandsOfAGoneRowDoNotRun() {
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            mail.setCommands("[\"give %player% diamond 1\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+
+            verify(receiver, never()).performCommand(anyString());
+            assertThat(mail.isCommandsExecuted()).isFalse();
+            verify(receiver).sendMessage(ArgumentMatchers.<String>argThat(m -> m.contains("[mail_commands_not_recorded]")));
+        }
+
+        @Test
+        @DisplayName("control: the same mail, its row present (count 1), runs its commands and is recorded")
+        void commandsOfAPresentRowRun() {
+            when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(1);
+            MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
+            mail.setCommands("[\"give %player% diamond 1\"]");
+
+            mailService.executeMailCommands(receiver, mail);
+
+            verify(receiver).performCommand("give ReceiverPlayer diamond 1");
+            assertThat(mail.isCommandsExecuted()).isTrue();
+        }
+    }
+
     // ==================== markAsRead Tests ====================
 
     @Nested
@@ -673,14 +742,14 @@ class MailServiceTest {
             mailService.markAsRead(mail);
 
             assertThat(mail.isRead()).isTrue();
-            verify(mockDataOperator).update(mail);
+            verify(mockDataOperator).updateCounted(mail);
         }
 
         @Test
         @DisplayName("update失败时应该记录错误")
         void shouldLogErrorOnUpdateFailure() throws Exception {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
-            doThrow(new IllegalAccessException("test error")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException(com.ultikits.ultitools.exceptions.ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("test error"))).when(mockDataOperator).updateCounted(mail);
 
             // Should not throw exception
             mailService.markAsRead(mail);
@@ -847,7 +916,7 @@ class MailServiceTest {
             mailService.executeMailCommands(receiver, mail);
 
             assertThat(mail.isCommandsExecuted()).isTrue();
-            verify(mockDataOperator).update(mail);
+            verify(mockDataOperator).updateCounted(mail);
         }
 
         @Test
@@ -892,7 +961,7 @@ class MailServiceTest {
             mailService.deleteMail(mail, receiverUuid);
 
             assertThat(mail.isDeletedByReceiver()).isTrue();
-            verify(mockDataOperator).update(mail);
+            verify(mockDataOperator).updateCounted(mail);
         }
 
         @Test
@@ -903,7 +972,7 @@ class MailServiceTest {
             mailService.deleteMail(mail, senderUuid);
 
             assertThat(mail.isDeletedBySender()).isTrue();
-            verify(mockDataOperator).update(mail);
+            verify(mockDataOperator).updateCounted(mail);
         }
 
         @Test
@@ -1064,7 +1133,7 @@ class MailServiceTest {
         @DisplayName("A failed update is reported as not recorded, logged, and the mail keeps its flags")
         void aFailedUpdateIsNotRecorded() throws Exception {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
-            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(any(MailData.class));
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).updateCounted(any(MailData.class));
 
             boolean recorded = mailService.recordDeletion(mail, receiverUuid);
 
@@ -1093,7 +1162,7 @@ class MailServiceTest {
         @DisplayName("The old deleteMail entry point no longer throws on a storage failure")
         void deleteMailDoesNotThrow() throws Exception {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
-            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(any(MailData.class));
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).updateCounted(any(MailData.class));
 
             mailService.deleteMail(mail, receiverUuid);
 
@@ -1107,14 +1176,14 @@ class MailServiceTest {
             MailData second = createTestMail("s2", "sender2", receiverUuid.toString(), "ReceiverPlayer");
             MailData third = createTestMail("s3", "sender3", receiverUuid.toString(), "ReceiverPlayer");
             when(mockQueryBuilder.list()).thenReturn(new ArrayList<>(java.util.Arrays.asList(first, second, third)));
-            doNothing().doThrow(new DataAccessException("connection lost")).doNothing()
-                    .when(mockDataOperator).update(any(MailData.class));
+            doReturn(1).doThrow(new DataAccessException("connection lost")).doReturn(1)
+                    .when(mockDataOperator).updateCounted(any(MailData.class));
 
             MailService.DeleteResult result = mailService.deleteAllFromInbox(receiverUuid);
 
             assertThat(result.getDeleted()).isEqualTo(2);
             assertThat(result.getNotRecorded()).isEqualTo(1);
-            verify(mockDataOperator, times(3)).update(any(MailData.class));
+            verify(mockDataOperator, times(3)).updateCounted(any(MailData.class));
         }
 
         @Test
@@ -1125,8 +1194,8 @@ class MailServiceTest {
             first.setRead(true);
             second.setRead(true);
             when(mockQueryBuilder.list()).thenReturn(new ArrayList<>(java.util.Arrays.asList(first, second)));
-            doThrow(new DataAccessException("connection lost")).doNothing()
-                    .when(mockDataOperator).update(any(MailData.class));
+            doThrow(new DataAccessException("connection lost")).doReturn(1)
+                    .when(mockDataOperator).updateCounted(any(MailData.class));
 
             MailService.DeleteResult result = mailService.deleteReadFromInbox(receiverUuid);
 
@@ -1490,7 +1559,7 @@ class MailServiceTest {
         @DisplayName("update异常时不应抛出")
         void shouldNotThrowOnUpdateException() throws Exception {
             MailData mail = createTestMail(senderUuid.toString(), "SenderPlayer", "r1", "receiver1");
-            doThrow(new IllegalAccessException("test")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException(com.ultikits.ultitools.exceptions.ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("test"))).when(mockDataOperator).updateCounted(mail);
 
             // Should not throw
             mailService.deleteMail(mail, senderUuid);
@@ -1549,7 +1618,7 @@ class MailServiceTest {
         void shouldNotThrowOnUpdateFailure() throws Exception {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setCommands("[\"test\"]");
-            doThrow(new IllegalAccessException("test")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException(com.ultikits.ultitools.exceptions.ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("test"))).when(mockDataOperator).updateCounted(mail);
 
             // Should not throw — caught by general catch(Exception)
             mailService.executeMailCommands(receiver, mail);
@@ -1571,7 +1640,7 @@ class MailServiceTest {
             mailService.executeMailCommands(receiver, mail);
 
             verify(receiver, never()).performCommand(anyString());
-            verify(mockDataOperator, never()).update(any(MailData.class));
+            verify(mockDataOperator, never()).updateCounted(any(MailData.class));
             assertThat(mail.isCommandsExecuted()).isFalse();
         }
     }
@@ -1809,7 +1878,7 @@ class MailServiceTest {
         @DisplayName("the executed marker cannot be written (unchecked database error): no command runs and the reader is told")
         void aFailedMarkerWriteRunsNoCommand() throws Exception {
             MailData mail = mailWithCommands("[\"give %player% diamond 1\",\"console:eco give %player% 100\"]");
-            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).updateCounted(mail);
 
             mailService.executeMailCommands(receiver, mail);
 
@@ -1822,7 +1891,7 @@ class MailServiceTest {
         @DisplayName("the executed marker cannot be written (IllegalAccessException): no command runs")
         void aCheckedMarkerWriteFailureRunsNoCommand() throws Exception {
             MailData mail = mailWithCommands("[\"give %player% diamond 1\"]");
-            doThrow(new IllegalAccessException("field not accessible")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException(com.ultikits.ultitools.exceptions.ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("field not accessible"))).when(mockDataOperator).updateCounted(mail);
 
             mailService.executeMailCommands(receiver, mail);
 
@@ -1839,8 +1908,8 @@ class MailServiceTest {
             doAnswer(inv -> {
                 ranAtWrite.add(ran.size());
                 markedAtWrite.add(((MailData) inv.getArgument(0)).isCommandsExecuted());
-                return null;
-            }).when(mockDataOperator).update(mail);
+                return 1;
+            }).when(mockDataOperator).updateCounted(mail);
 
             mailService.executeMailCommands(receiver, mail);
 
@@ -1853,7 +1922,7 @@ class MailServiceTest {
         @DisplayName("across a failed marker write the commands run exactly once")
         void theCommandsRunExactlyOnce() throws Exception {
             MailData mail = mailWithCommands("[\"give %player% diamond 1\"]");
-            doThrow(new DataAccessException("connection lost")).doNothing().when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException("connection lost")).doReturn(1).when(mockDataOperator).updateCounted(mail);
 
             mailService.executeMailCommands(receiver, mail);
             mailService.executeMailCommands(receiver, mail);
@@ -1966,7 +2035,7 @@ class MailServiceTest {
         @DisplayName("an unchecked database error while marking read is logged, not thrown")
         void markAsReadSurvivesADatabaseError() throws Exception {
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
-            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).update(mail);
+            doThrow(new DataAccessException("connection lost")).when(mockDataOperator).updateCounted(mail);
 
             mailService.markAsRead(mail);
 

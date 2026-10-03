@@ -185,8 +185,8 @@ class MailboxGUIClaimTest {
             if (markerWritesFail[0] && ((MailData) inv.getArgument(0)).isCommandsExecuted()) {
                 throw new DataAccessException("connection lost");
             }
-            return null;
-        }).when(operator).update(any(MailData.class));
+            return 1;
+        }).when(operator).updateCounted(any(MailData.class));
         when(plugin.getDataOperator(any())).thenReturn((DataOperator) operator);
         MailService service = new MailService();
         TestHelper.injectField(service, "plugin", plugin);
@@ -246,6 +246,7 @@ class MailboxGUIClaimTest {
             when(query.eq(any())).thenReturn(query);
             when(query.list()).thenReturn(new ArrayList<>());
             when(operator.query()).thenReturn(query);
+            when(operator.updateCounted(any(MailData.class))).thenReturn(1);
             when(plugin.getDataOperator(any())).thenReturn((DataOperator) operator);
             MailService service = new MailService();
             TestHelper.injectField(service, "plugin", plugin);
