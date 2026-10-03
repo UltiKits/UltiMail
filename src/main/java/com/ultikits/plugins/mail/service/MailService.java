@@ -489,13 +489,22 @@ public class MailService {
     /**
      * Writes a mail's flags and returns {@code null}, or the failure's message instead of throwing:
      * the relational backends throw the unchecked {@link DataAccessException} on any SQL error, and
-     * {@code update} declares {@code IllegalAccessException}.
+     * {@code updateCounted} wraps the {@code IllegalAccessException} that {@code update} declares in one.
+     * <p>
+     * The write goes through {@code updateCounted} because an update of a row that no longer exists writes
+     * nothing and returns normally on every backend (UltiTools-Reborn#558), which {@code update} gives the
+     * caller no way to see. The row can be gone: an administrator or another server on a shared database
+     * removed it while a reader held the mail in an open mailbox. A count of {@code 0} is reported as a
+     * failure, the same as a thrown write, so every caller takes its failure path - a claim hands nothing over,
+     * the attached commands do not run, and the flags are restored (UltiKits/UltiMail#44).
      */
     private String writeFailure(MailData mail) {
         try {
-            dataOperator.update(mail);
+            if (dataOperator.updateCounted(mail) == 0) {
+                return "no stored mail with id " + mail.getId() + " to write to";
+            }
             return null;
-        } catch (IllegalAccessException | DataAccessException e) {
+        } catch (DataAccessException e) {
             return String.valueOf(e.getMessage());
         }
     }

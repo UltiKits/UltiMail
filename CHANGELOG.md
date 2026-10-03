@@ -33,6 +33,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A mail change whose stored row has been removed in the meantime is now reported as not saved, on every storage
+  type. If an administrator deleted a mail from storage, or another server on a shared database did, while a
+  player had the mailbox open, clicking that mail still marked the claim as saved and handed over the attachment
+  (and ran its attached commands) from a mail that no longer existed. Now the claim is refused with `Your claim
+  could not be recorded, so nothing was given. Please try again.`, the attached commands do not run, and the
+  failure is logged; marking a mail read and deleting a mail log it the same way. Before, only the JSON storage
+  reported a missing row, with an error (UltiKits/UltiMail#44).
+- 邮件的存储行在此期间被移除时，对该邮件的改动现在在所有存储类型上都按“未保存”处理。此前若管理员或共享数据库上的另一台服务器在玩家打开
+  收件箱期间删除了某封邮件，点击该邮件仍会记为已领取，并从已不存在的邮件里发放附件、执行附带命令。现在领取会被拒绝
+  （`Your claim could not be recorded, so nothing was given. Please try again.`），附带命令不会执行，并记录日志；标记已读和删除邮件
+  同样记录日志。此前只有 JSON 存储会报告缺行，并且报的是错误（UltiKits/UltiMail#44）。
 - A mail's attached commands now run on the server tick after you click the mail in the mailbox (`/mail read`)
   instead of inside the click. The framework now runs a command at the moment it is dispatched, so an attached
   command that opens or closes a GUI (`/kits`, another module's menu, `/mail sentgui`) would otherwise have run
