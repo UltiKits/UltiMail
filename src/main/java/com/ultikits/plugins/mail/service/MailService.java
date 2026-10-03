@@ -429,9 +429,10 @@ public class MailService {
      * handed the items over first and only logged a failed write, and because {@link #getInbox}
      * re-reads the table on every command the same attachment could then be claimed again at once
      * (UltiKits/UltiMail#31). On a failed write the in-memory flag is restored, nothing is handed over,
-     * and the result tells the caller so. Both write failures are caught: {@code update}'s declared
-     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
-     * backends throw on any SQL error. On the JSON storage backend a write only reaches an in-memory
+     * and the result tells the caller so. A failed write is caught: the unchecked
+     * {@link DataAccessException} the relational backends throw on any SQL error ({@code updateCounted}
+     * wraps the {@code IllegalAccessException} that {@code update} declares in one), and a write that
+     * matches no stored row is a failure too (UltiKits/UltiMail#44). On the JSON storage backend a write only reaches an in-memory
      * cache that a timer flushes to disk, so a disk failure there cannot be seen at claim time - the
      * framework's storage contract, not changed here.
      * <p>
@@ -544,8 +545,8 @@ public class MailService {
      * {@link #executeMailCommands}: the commands are parsed and the executed marker is written
      * <b>before</b> anything is scheduled, and when it cannot be written nothing is scheduled and the
      * reader is told (UltiKits/UltiMail#31). Only the dispatch loop moves, with its per-command guard and
-     * its rejected-command log line unchanged. When the scheduler refuses the task (the module is being
-     * unloaded) no command ran, so the marker is cleared again and the failure logged: the mail's commands
+     * its rejected-command log line unchanged. When the scheduler refuses the task (the UltiTools plugin that
+     * owns it is disabled, so no server tick is left to run it) no command ran, so the marker is cleared again and the failure logged: the mail's commands
      * run when it is read again, rather than being recorded as run and lost.
      * <p>
      * 与 {@link #executeMailCommands} 相同，但命令本身推迟到下一个服务器 tick 执行，供在背包点击处理中调用。
@@ -562,6 +563,8 @@ public class MailService {
             Bukkit.getScheduler().runTask(bukkitPlugin, () -> dispatchCommands(player, mail, commands));
         } catch (RuntimeException e) {
             mail.setCommandsExecuted(false);
+            // Best effort: if this reset write fails too, the stored flag stays set and the line logged below
+            // is the only trace.
             writeFailure(mail);
             plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
         }
@@ -658,10 +661,13 @@ public class MailService {
      * <p>
      * A write the storage cannot make is caught, logged with {@code log_update_mail_failed} and
      * reported as not recorded, and the mail keeps the flags it had, so it is still there and can be
-     * deleted again. Both write failures are caught: {@code update}'s declared
-     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
-     * backends throw on any SQL error, which used to escape and abort {@code /mail delete},
-     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38).
+     * deleted again. A failed write is caught: the unchecked {@link DataAccessException} the relational
+     * backends throw on any SQL error ({@code updateCounted} wraps the {@code IllegalAccessException} that
+     * {@code update} declares in one), which used to escape and abort {@code /mail delete},
+     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38). A write that matches no stored
+     * row is a failure too: the mail is already gone, which is reported as not recorded rather than
+     * special-cased, because every delete path re-reads the inbox in the same command, so this only
+     * happens when another writer removes the row between that read and this write (UltiKits/UltiMail#44).
      * <p>
      * 存储无法写入时记录日志并返回「未记录」，邮件保持原状态，不再抛出异常中断命令。
      *
