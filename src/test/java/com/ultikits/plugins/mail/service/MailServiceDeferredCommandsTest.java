@@ -20,9 +20,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,7 +32,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -121,17 +121,23 @@ class MailServiceDeferredCommandsTest {
     @Test
     @DisplayName("player and console commands run in their written order, console: prefix and %player% handled as before")
     void keepsOrderAndPlaceholders() throws Exception {
-        when(reader.performCommand(anyString())).thenReturn(true);
-        bukkit.when(() -> Bukkit.dispatchCommand(any(), anyString())).thenReturn(true);
+        List<String> order = new ArrayList<>();
+        when(reader.performCommand(anyString())).thenAnswer(inv -> {
+            order.add("player:" + inv.getArgument(0));
+            return true;
+        });
+        bukkit.when(() -> Bukkit.dispatchCommand(any(), anyString())).thenAnswer(inv -> {
+            assertThat((Object) inv.getArgument(0)).isSameAs(console);
+            order.add("console:" + inv.getArgument(1));
+            return true;
+        });
         MailData mail = mailWith("[\"a %player%\",\"console:b %player%\",\"c\"]");
 
         service.executeMailCommandsDeferred(reader, mail);
+        assertThat(order).as("nothing before the task").isEmpty();
         scheduledTask().run();
 
-        InOrder order = inOrder(reader);
-        order.verify(reader).performCommand("a Reader");
-        bukkit.verify(() -> Bukkit.dispatchCommand(eq(console), eq("b Reader")));
-        order.verify(reader).performCommand("c");
+        assertThat(order).containsExactly("player:a Reader", "console:b Reader", "player:c");
     }
 
     @Test

@@ -71,7 +71,10 @@ import java.util.stream.Stream;
  * arrow, a call after a comparison, a forwarding call inside an anonymous class), each fix exposing
  * the next, so the lexer was replaced by the compiler's parser instead of being patched again.
  * <p>
- * This file is copied unchanged into every module; only its package line differs.
+ * This file is copied into every module with one deliberate difference: the modules that have adopted
+ * translatable config comments (UltiMail has; see {@link SiteKind#CONFIG_COMMENT}) also read a comment that is
+ * exactly one {@code {key}} token as a catalogue key site, so guard 1 checks that key in both catalogues.
+ * The other modules keep the earlier form of that part. Its package line differs as well.
  */
 final class I18nSourceScanner {
 
