@@ -674,7 +674,7 @@ class MailServiceTest {
 
         @BeforeEach
         void rowIsGone() {
-            when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(0);
+            lenient().when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(0);
         }
 
         @Test
@@ -716,7 +716,7 @@ class MailServiceTest {
         @Test
         @DisplayName("control: the same mail, its row present (count 1), runs its commands and is recorded")
         void commandsOfAPresentRowRun() {
-            when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(1);
+            lenient().when(mockDataOperator.updateCounted(any(MailData.class))).thenReturn(1);
             MailData mail = createTestMail("s1", "sender1", receiverUuid.toString(), "ReceiverPlayer");
             mail.setCommands("[\"give %player% diamond 1\"]");
 
