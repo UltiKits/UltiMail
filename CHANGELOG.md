@@ -49,12 +49,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   command that opens or closes a GUI (`/kits`, another module's menu, `/mail sentgui`) would otherwise have run
   inside the click event, which Paper does not allow, and could fail or leave the mailbox in a broken state.
   The mail is still recorded as run before anything runs, a command that fails is still logged and does not
-  stop the ones after it, and the commands still run in their written order and only once. `/mail read <number>`
+  stop the ones after it, and the commands still run in their written order and only once. The attachment
+  claim in the same click now happens first, so an attached command that gives items can no longer take the
+  inventory slots the claim needs. `/mail read <number>`
   typed as a command is unchanged (UltiKits/UltiMail#43).
 - 在收件箱（`/mail read`）中点击邮件时，邮件附带的命令现在在点击之后的下一个服务器 tick 执行，而不是在点击事件内执行。
   框架现在在命令被派发的当下就运行它，因此会开关界面的附带命令（`/kits`、其他模块的菜单、`/mail sentgui`）
   原本会在点击事件内执行，Paper 不允许这样做，可能失败或让收件箱处于异常状态。邮件仍然先于任何命令被记录为已执行，
-  失败的命令仍会记录日志且不会中断后面的命令，命令仍按书写顺序且只执行一次。以命令形式输入的 `/mail read <序号>`
+  失败的命令仍会记录日志且不会中断后面的命令，命令仍按书写顺序且只执行一次。同一次点击中的附件领取现在先于命令执行，
+  因此发放物品的附带命令不会再占用领取所需的背包格子。以命令形式输入的 `/mail read <序号>`
   不变（UltiKits/UltiMail#43）。
 - `config/mail.yml` now writes its comments in the server's language. Twenty comments (every setting in the
   file) used to be Chinese-only, so a fresh install under `language: en` got a file with Chinese comments.
