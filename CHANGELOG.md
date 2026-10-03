@@ -33,6 +33,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `config/mail.yml` now writes its comments in the server's language. Twenty comments (every setting in the
+  file) used to be Chinese-only, so a fresh install under `language: en` got a file with Chinese comments.
+  Each is now a language-file key that the framework resolves in the server's `language` every time it
+  writes the file, with an English and a Chinese entry in `lang/en.yml` and `lang/zh.yml`. On an existing
+  server the comments on these twenty settings switch to the server's language at the next start; values are
+  untouched, and a comment you wrote by hand on one of these settings is replaced (UltiKits/UltiMail#42).
+- `config/mail.yml` 的注释现在跟随服务器语言。此前有二十条注释（文件中的每个设置）只有中文，`language: en`
+  的全新安装得到的文件注释是中文。现在每条注释都是一个语言文件键，框架每次写入文件时按服务器的 `language` 解析，
+  `lang/en.yml` 与 `lang/zh.yml` 各有英文和中文条目。已有服务器上这二十个设置的注释会在下次启动时切换为服务器语言；
+  设置值不受影响，你手写在这些设置上的注释会被替换（UltiKits/UltiMail#42）。
+
 - The attachment selector (`/sendmail <player> <subject> attach` for a sender with
   `ultimail.admin.multiattach`) now takes items by shift-click from your own inventory, into the first
   free attachment slot, and by dragging into the attachment area; before, both were refused and only a

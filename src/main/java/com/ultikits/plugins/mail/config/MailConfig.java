@@ -31,84 +31,84 @@ public class MailConfig extends AbstractConfigEntity {
      */
     public static final String CONFIG_FILE = "config/mail.yml";
     
-    @ConfigEntry(path = "max-items", comment = "每封邮件最多附带物品数量")
+    @ConfigEntry(path = "max-items", comment = "{config_comment_max_items}")
     @Range(min = 1, max = 54)
     private int maxItems = 27;
 
-    @ConfigEntry(path = "notify-on-join", comment = "玩家登录时通知未读邮件")
+    @ConfigEntry(path = "notify-on-join", comment = "{config_comment_notify_on_join}")
     private boolean notifyOnJoin = true;
 
-    @ConfigEntry(path = "notify-delay", comment = "登录通知延迟（秒）")
+    @ConfigEntry(path = "notify-delay", comment = "{config_comment_notify_delay}")
     @Range(min = 0, max = 60)
     private int notifyDelay = 3;
 
-    @ConfigEntry(path = "max-subject-length", comment = "邮件标题最大长度")
+    @ConfigEntry(path = "max-subject-length", comment = "{config_comment_max_subject_length}")
     @Range(min = 10, max = 200)
     private int maxSubjectLength = 50;
 
-    @ConfigEntry(path = "max-content-length", comment = "邮件内容最大长度")
+    @ConfigEntry(path = "max-content-length", comment = "{config_comment_max_content_length}")
     @Range(min = 50, max = 5000)
     private int maxContentLength = 500;
 
-    @ConfigEntry(path = "send-cooldown", comment = "发送邮件冷却时间（秒）")
+    @ConfigEntry(path = "send-cooldown", comment = "{config_comment_send_cooldown}")
     @Range(min = 0, max = 300)
     private int sendCooldown = 10;
     
     // Each text setting's Java default is the one it shipped with in every earlier version, which the
     // framework writes for a missing key; materializeText() then writes the jar's text in the server's
     // language while the value is still built-in text (maintainer decision 2026-09-25).
-    @ConfigEntry(path = "messages.mail-received", comment = "收到新邮件")
+    @ConfigEntry(path = "messages.mail-received", comment = "{config_comment_messages_mail_received}")
     @NotEmpty
     private String mailReceivedMessage = SHIPPED_MAIL_RECEIVED;
     
     // ========== 召回玩家功能配置 ==========
     
-    @ConfigEntry(path = "recall.server-name", comment = "服务器名称，用于召回邮件显示")
+    @ConfigEntry(path = "recall.server-name", comment = "{config_comment_recall_server_name}")
     @NotEmpty
     private String serverName = SHIPPED_SERVER_NAME;
 
-    @ConfigEntry(path = "recall.subject", comment = "游戏内召回邮件标题")
+    @ConfigEntry(path = "recall.subject", comment = "{config_comment_recall_subject}")
     @NotEmpty
     private String recallSubject = SHIPPED_RECALL_SUBJECT;
 
-    @ConfigEntry(path = "recall.content", comment = "游戏内召回邮件内容")
+    @ConfigEntry(path = "recall.content", comment = "{config_comment_recall_content}")
     @NotEmpty
     private String recallContent = SHIPPED_RECALL_CONTENT;
     
     // ========== 真实邮件发送配置 ==========
     
-    @ConfigEntry(path = "email.enabled", comment = "是否启用真实邮件发送功能")
+    @ConfigEntry(path = "email.enabled", comment = "{config_comment_email_enabled}")
     private boolean emailEnabled = false;
     
-    @ConfigEntry(path = "email.smtp-host", comment = "SMTP服务器地址")
+    @ConfigEntry(path = "email.smtp-host", comment = "{config_comment_email_smtp_host}")
     @NotEmpty
     private String smtpHost = "smtp.example.com";
 
-    @ConfigEntry(path = "email.smtp-port", comment = "SMTP端口")
+    @ConfigEntry(path = "email.smtp-port", comment = "{config_comment_email_smtp_port}")
     @Range(min = 1, max = 65535)
     private int smtpPort = 587;
 
-    @ConfigEntry(path = "email.smtp-username", comment = "SMTP用户名")
+    @ConfigEntry(path = "email.smtp-username", comment = "{config_comment_email_smtp_username}")
     private String smtpUsername = "";
 
-    @ConfigEntry(path = "email.smtp-password", comment = "SMTP密码")
+    @ConfigEntry(path = "email.smtp-password", comment = "{config_comment_email_smtp_password}")
     private String smtpPassword = "";
 
-    @ConfigEntry(path = "email.smtp-from-email", comment = "发件人邮箱地址")
+    @ConfigEntry(path = "email.smtp-from-email", comment = "{config_comment_email_smtp_from_email}")
     @NotEmpty
     private String smtpFromEmail = "noreply@example.com";
     
-    @ConfigEntry(path = "email.smtp-ssl", comment = "是否使用SSL加密")
+    @ConfigEntry(path = "email.smtp-ssl", comment = "{config_comment_email_smtp_ssl}")
     private boolean smtpSsl = false;
     
-    @ConfigEntry(path = "email.smtp-starttls", comment = "是否使用STARTTLS加密")
+    @ConfigEntry(path = "email.smtp-starttls", comment = "{config_comment_email_smtp_starttls}")
     private boolean smtpStartTls = true;
     
-    @ConfigEntry(path = "email.recall-subject", comment = "召回电子邮件标题")
+    @ConfigEntry(path = "email.recall-subject", comment = "{config_comment_email_recall_subject}")
     @NotEmpty
     private String recallEmailSubject = SHIPPED_RECALL_EMAIL_SUBJECT;
 
-    @ConfigEntry(path = "email.recall-content", comment = "召回电子邮件内容")
+    @ConfigEntry(path = "email.recall-content", comment = "{config_comment_email_recall_content}")
     @NotEmpty
     private String recallEmailContent = SHIPPED_RECALL_EMAIL_CONTENT;
     
