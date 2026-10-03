@@ -192,6 +192,9 @@ class MailboxGUIClaimTest {
         TestHelper.injectField(service, "plugin", plugin);
         TestHelper.injectField(service, "config", new MailConfig());
         service.init();
+        // init() looks the framework plugin up by name, which a MockBukkit server does not have; the
+        // scheduler needs a plugin to run the deferred commands for.
+        TestHelper.injectField(service, "bukkitPlugin", server.getPluginManager().getPlugins()[0]);
         MailboxGUI page = new MailboxGUI(reader, service, plugin);
         injectInventory(page);
         Method handler = MailboxGUI.class.getDeclaredMethod("handleMailClick", MailData.class);
@@ -202,13 +205,106 @@ class MailboxGUIClaimTest {
         mail.setCommands("[\"give %player% diamond 1\"]");
 
         handler.invoke(page, mail);
+        server.getScheduler().performOneTick();
         assertThat(ran).isEmpty();
         assertThat(mail.isCommandsExecuted()).isFalse();
         markerWritesFail[0] = false;
         handler.invoke(page, mail);
         handler.invoke(page, mail);
+        server.getScheduler().performOneTick();
 
         assertThat(ran).containsExactly("give commandreader diamond 1");
         assertThat(mail.isCommandsExecuted()).isTrue();
+    }
+
+    /**
+     * A real {@link MailService} over a storage stub whose reader records the commands it runs and
+     * whether the page was still inside the click when each ran.
+     */
+    private final class ClickRig {
+        final List<String> ran = new ArrayList<>();
+        final List<Boolean> ranInsideClick = new ArrayList<>();
+        final boolean[] insideClick = {false};
+        final MailboxGUI page;
+        final Method handler;
+
+        @SuppressWarnings("unchecked")
+        ClickRig() throws Exception {
+            PlayerMock reader = new PlayerMock(server, "clickreader") {
+                @Override
+                public boolean performCommand(String command) {
+                    ran.add(command);
+                    ranInsideClick.add(insideClick[0]);
+                    return true;
+                }
+            };
+            server.addPlayer(reader);
+            UltiToolsPlugin plugin = TestHelper.mockUltiToolsPlugin();
+            DataOperator<MailData> operator = mock(DataOperator.class);
+            Query<MailData> query = mock(Query.class);
+            when(query.where(anyString())).thenReturn(query);
+            when(query.eq(any())).thenReturn(query);
+            when(query.list()).thenReturn(new ArrayList<>());
+            when(operator.query()).thenReturn(query);
+            when(plugin.getDataOperator(any())).thenReturn((DataOperator) operator);
+            MailService service = new MailService();
+            TestHelper.injectField(service, "plugin", plugin);
+            TestHelper.injectField(service, "config", new MailConfig());
+            service.init();
+            TestHelper.injectField(service, "bukkitPlugin", server.getPluginManager().getPlugins()[0]);
+            page = new MailboxGUI(reader, service, plugin);
+            injectInventory(page);
+            handler = MailboxGUI.class.getDeclaredMethod("handleMailClick", MailData.class);
+            handler.setAccessible(true); // NOPMD - the click handler is private; a click reaches it the same way
+        }
+
+        void click(MailData mail) throws Exception {
+            insideClick[0] = true;
+            try {
+                handler.invoke(page, mail);
+            } finally {
+                insideClick[0] = false;
+            }
+        }
+    }
+
+    private static MailData mailWithCommands(String id, String commandsJson) {
+        MailData mail = new MailData();
+        mail.setId(id);
+        mail.setRead(false);
+        mail.setCommands(commandsJson);
+        return mail;
+    }
+
+    @Test
+    @DisplayName("a mail's attached commands do not run inside the click handler: they run on the next tick, in order, after the click (UltiMail#43)")
+    void commandsRunOnTheNextTickNotInsideTheClick() throws Exception {
+        ClickRig rig = new ClickRig();
+        MailData mail = mailWithCommands("mail-11", "[\"first %player%\",\"second\",\"third\"]");
+
+        rig.click(mail);
+
+        assertThat(rig.ran).as("nothing runs while the click event is being handled").isEmpty();
+        assertThat(mail.isCommandsExecuted()).as("the executed marker is written in the click, before any command runs").isTrue();
+
+        server.getScheduler().performOneTick();
+
+        assertThat(rig.ran).containsExactly("first clickreader", "second", "third");
+        assertThat(rig.ranInsideClick).as("every command ran after the click returned").containsOnly(false);
+    }
+
+    @Test
+    @DisplayName("control: a second click on the same mail runs nothing again, before or after the tick")
+    void aSecondClickRunsNothingAgain() throws Exception {
+        ClickRig rig = new ClickRig();
+        MailData mail = mailWithCommands("mail-12", "[\"once\"]");
+
+        rig.click(mail);
+        rig.click(mail);
+        server.getScheduler().performOneTick();
+        rig.click(mail);
+        server.getScheduler().performOneTick();
+
+        assertThat(rig.ran).containsExactly("once");
     }
 }
