@@ -298,10 +298,16 @@ class MailConfigTextTest {
             byte[] afterFirst = bytes();
 
             MailConfig second = spy(load());
+            byte[] afterFrameworkLoad = bytes();
             start(second);
 
-            assertThat(bytes()).as(code).isEqualTo(afterFirst);
+            // The module's own start writes nothing: the file is what the framework's load left.
+            assertThat(bytes()).as(code).isEqualTo(afterFrameworkLoad);
             verify(second, never()).save();
+            // The framework's load may rewrite comment lines (they are language-file tokens it resolves on every
+            // write; after the module's first save it moves a misplaced duplicate, UltiTools-Reborn#592), but
+            // never a setting.
+            assertThat(withoutCommentLines(afterFrameworkLoad)).as(code + ": settings").isEqualTo(withoutCommentLines(afterFirst));
         }
     }
 
@@ -556,6 +562,16 @@ class MailConfigTextTest {
 
     private static String get(MailConfig config, Setting s) throws Exception {
         return (String) MailConfig.class.getMethod(s.getter()).invoke(config);
+    }
+
+    private static String withoutCommentLines(byte[] yaml) {
+        StringBuilder out = new StringBuilder();
+        for (String line : new String(yaml, StandardCharsets.UTF_8).split("\n", -1)) {
+            if (!line.trim().startsWith("#")) {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
     }
 
     private File file() {
