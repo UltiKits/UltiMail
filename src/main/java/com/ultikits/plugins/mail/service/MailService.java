@@ -518,8 +518,55 @@ public class MailService {
      * 附带命令先写入「已执行」标记再执行；标记写入失败则不执行任何命令并提示读者。
      */
     public void executeMailCommands(Player player, MailData mail) {
-        if (!mail.hasCommands() || mail.isCommandsExecuted()) {
+        List<String> commands = recordCommandsExecuted(player, mail);
+        if (commands != null) {
+            dispatchCommands(player, mail, commands);
+        }
+    }
+
+    /**
+     * {@link #executeMailCommands}, with the commands themselves run on the next server tick
+     * (UltiKits/UltiMail#43). For a caller that is itself inside an inventory click handler, as the
+     * mailbox GUI is: since UltiTools-Reborn#541 a module command body runs at the moment it is
+     * dispatched, so an attached command that opens or closes an inventory ({@code /kits}, another
+     * module's menu) would run inside the {@code InventoryClickEvent}, which Paper does not allow.
+     * <p>
+     * Everything that decides whether the commands run is still done in this call, exactly as in
+     * {@link #executeMailCommands}: the commands are parsed and the executed marker is written
+     * <b>before</b> anything is scheduled, and when it cannot be written nothing is scheduled and the
+     * reader is told (UltiKits/UltiMail#31). Only the dispatch loop moves, with its per-command guard and
+     * its rejected-command log line unchanged. When the scheduler refuses the task (the module is being
+     * unloaded) no command ran, so the marker is cleared again and the failure logged: the mail's commands
+     * run when it is read again, rather than being recorded as run and lost.
+     * <p>
+     * 与 {@link #executeMailCommands} 相同，但命令本身推迟到下一个服务器 tick 执行，供在背包点击处理中调用。
+     *
+     * @param player the reader the commands run for
+     * @param mail   the mail whose attached commands are run
+     */
+    public void executeMailCommandsDeferred(Player player, MailData mail) {
+        List<String> commands = recordCommandsExecuted(player, mail);
+        if (commands == null) {
             return;
+        }
+        try {
+            Bukkit.getScheduler().runTask(bukkitPlugin, () -> dispatchCommands(player, mail, commands));
+        } catch (RuntimeException e) {
+            mail.setCommandsExecuted(false);
+            writeFailure(mail);
+            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
+        }
+    }
+
+    /**
+     * Parses a mail's attached commands and writes the executed marker, before any command runs.
+     *
+     * @return the commands to run, or {@code null} when there is nothing to run or the marker could not be
+     *         written (the failure is logged and, for an unwritable marker, the reader is told)
+     */
+    private List<String> recordCommandsExecuted(Player player, MailData mail) {
+        if (!mail.hasCommands() || mail.isCommandsExecuted()) {
+            return null;
         }
 
         List<String> commands;
@@ -527,10 +574,10 @@ public class MailService {
             commands = GSON.fromJson(mail.getCommands(), STRING_LIST_TYPE);
         } catch (RuntimeException e) {
             plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
-            return;
+            return null;
         }
         if (commands == null || commands.isEmpty()) {
-            return;
+            return null;
         }
 
         mail.setCommandsExecuted(true);
@@ -539,9 +586,13 @@ public class MailService {
             mail.setCommandsExecuted(false);
             plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", failure));
             player.sendMessage(ChatColor.RED + plugin.i18n("mail_commands_not_recorded"));
-            return;
+            return null;
         }
+        return commands;
+    }
 
+    /** Runs the commands in order, each in its own guard, once the marker is written. */
+    private void dispatchCommands(Player player, MailData mail, List<String> commands) {
         for (String command : commands) {
             // Everything per command is inside the guard - a null entry from an API caller included - so
             // one bad entry can neither stop the commands after it nor escape after the marker was
