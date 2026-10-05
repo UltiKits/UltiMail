@@ -70,7 +70,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `config/mail.yml` 的注释现在跟随服务器语言。此前有二十条注释（文件中的每个设置）只有中文，`language: en`
   的全新安装得到的文件注释是中文。现在每条注释都是一个语言文件键，框架每次写入文件时按服务器的 `language` 解析，
   `lang/en.yml` 与 `lang/zh.yml` 各有英文和中文条目。已有服务器上框架在这二十个设置上写下的注释（包括旧版本写下的中文注释）
-  会在下次启动时、以及你修改 `language` 并执行 不带参数的 `/ul reload` 后切换为服务器语言；设置值不受影响，你自己写的注释保持原样
+  会在下次启动时、以及你修改 `language` 并执行不带参数的 `/ul reload` 后切换为服务器语言；设置值不受影响，你自己写的注释保持原样
   （UltiKits/UltiTools-Reborn#611）（UltiKits/UltiMail#42）。
 
 - The attachment selector (`/sendmail <player> <subject> attach` for a sender with
@@ -264,7 +264,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting.
   To customise them, copy the official language file to one whose name starts with its language code and
   a hyphen (for example `lang/en-myserver.yml`), edit the entries there and set `language: en-myserver` in
-  `plugins/UltiTools/config.yml`; an edit made in the official file itself is restored at the next start,
+  `plugins/UltiTools/config.yml`; an edit made in the official file itself is restored at the next start or module reload,
   the edited file kept as `.bak` (UltiKits/UltiTools-Reborn#616). Their placeholders differ from the removed keys': `notify_new_mail`
   carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
   name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
@@ -289,7 +289,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   本来就从本模块的语言文件读取文本——`config` 文件夹旁 `lang/<语言>.yml` 中的 `notify_new_mail` 与
   `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置。要自定义它们，请把官方语言文件复制为以其语言代码加连字符开头的文件
   （例如 `lang/zh-myserver.yml`），在副本中修改这些条目，并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver`；
-  直接修改官方文件的改动会在下次启动时被恢复，修改过的文件保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。这两个条目的占位符与被移除的
+  直接修改官方文件的改动会在下次启动或模块重载时被恢复，修改过的文件保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。这两个条目的占位符与被移除的
   键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
   （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
   填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
