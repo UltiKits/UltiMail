@@ -65,12 +65,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   writes the file, with an English and a Chinese entry in `lang/en.yml` and `lang/zh.yml`. On an existing
   server the comments the framework wrote on these twenty settings, the Chinese ones earlier versions wrote
   included, switch to the server's language at the next start, and after you change `language` and run
-  `/ul reload`; values are untouched, and a comment you wrote yourself is kept as you wrote it
+  a bare `/ul reload`; values are untouched, and a comment you wrote yourself is kept as you wrote it
   (UltiKits/UltiTools-Reborn#611) (UltiKits/UltiMail#42).
 - `config/mail.yml` 的注释现在跟随服务器语言。此前有二十条注释（文件中的每个设置）只有中文，`language: en`
   的全新安装得到的文件注释是中文。现在每条注释都是一个语言文件键，框架每次写入文件时按服务器的 `language` 解析，
   `lang/en.yml` 与 `lang/zh.yml` 各有英文和中文条目。已有服务器上框架在这二十个设置上写下的注释（包括旧版本写下的中文注释）
-  会在下次启动时、以及你修改 `language` 并执行 `/ul reload` 后切换为服务器语言；设置值不受影响，你自己写的注释保持原样
+  会在下次启动时、以及你修改 `language` 并执行 不带参数的 `/ul reload` 后切换为服务器语言；设置值不受影响，你自己写的注释保持原样
   （UltiKits/UltiTools-Reborn#611）（UltiKits/UltiMail#42）。
 
 - The attachment selector (`/sendmail <player> <subject> attach` for a sender with
@@ -261,8 +261,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   effect: nothing read them, so editing them never changed what a player saw. The unread-mail
   notification on join and the confirmation a sender gets after sending already take their text
   from this module's language file, entries `notify_new_mail` and `mail_sent_success` in
-  `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting
-  and are customised there. Their placeholders differ from the removed keys': `notify_new_mail`
+  `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting.
+  To customise them, copy the official language file to one whose name starts with its language code and
+  a hyphen (for example `lang/en-myserver.yml`), edit the entries there and set `language: en-myserver` in
+  `plugins/UltiTools/config.yml`; an edit made in the official file itself is restored at the next start,
+  the edited file kept as `.bak` (UltiKits/UltiTools-Reborn#616). Their placeholders differ from the removed keys': `notify_new_mail`
   carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
   name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
   the framework, which then uses the bundled text. The join notification does not yet put the
@@ -270,7 +273,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for the message an online receiver gets when a mail arrives, is read and stays. A server upgraded
   from an earlier version keeps both removed keys in its `mail.yml`; while either is there, the
   module logs one warning for it at startup and on every reload of this module, naming the file,
-  the key and the language entry to edit instead, and the key can simply be deleted
+  the key and the language entry that now holds the text, and the key can simply be deleted
   (UltiKits/UltiMail#23).
 - 移除本模块在卸载与重载时输出的"UltiMail 已禁用！"与"UltiMail 配置已重载！"控制台行，以及未被使用的
   `mail_disabled`、`mail_reloaded` 语言键。UltiTools 6.3.0 会为每个模块输出一行重载日志
@@ -284,10 +287,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 移除 `config/mail.yml` 中的 `messages.new-mail` 与 `messages.mail-sent` 设置项。二者都从未生效：没有任何代码
   读取它们，修改它们从未改变玩家看到的内容。玩家登录时的未读邮件提醒，以及发送者发出邮件后收到的确认消息，
   本来就从本模块的语言文件读取文本——`config` 文件夹旁 `lang/<语言>.yml` 中的 `notify_new_mail` 与
-  `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置，也应在那里修改。这两个条目的占位符与被移除的
+  `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置。要自定义它们，请把官方语言文件复制为以其语言代码加连字符开头的文件
+  （例如 `lang/zh-myserver.yml`），在副本中修改这些条目，并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver`；
+  直接修改官方文件的改动会在下次启动时被恢复，修改过的文件保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。这两个条目的占位符与被移除的
   键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
   （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
   填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
   同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
   服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
-  为它记录一条警告，指出文件、键名以及应改为修改的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
+  为它记录一条警告，指出文件、键名以及现在保存该文本的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
