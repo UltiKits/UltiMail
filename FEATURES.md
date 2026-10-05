@@ -225,8 +225,11 @@ row carry a `config` Kind.
 `{config_comment_<path>}` language key (`lang/en.yml`, `lang/zh.yml`; the path's dots and hyphens become
 underscores, for example `{config_comment_email_smtp_host}`), which the framework resolves in the server's
 `language` each time it writes the file (`UltiTools-Reborn#542`), so a fresh install under `language: en`
-writes English comments. On an existing file the comments on those twenty settings switch at the next start,
-values untouched, and a hand-written comment there is replaced (`UltiKits/UltiMail#42`).
+writes English comments. On an existing file the comments the framework wrote on those twenty settings
+(recognised only by exact equality with a text one of the module's shipped catalogues holds, so the Chinese
+comments earlier versions wrote count as the framework's) switch at the next start and after the framework
+rebuilds the language on a bare `/ul reload`, values untouched; a comment an operator wrote by hand is kept
+byte for byte (`UltiKits/UltiTools-Reborn#611`, `UltiKits/UltiMail#42`).
 
 **Three keys that were declared and validated but never read by any production code —
 `mail-expire-days`, `messages.new-mail` and `messages.mail-sent` — were removed by
