@@ -125,8 +125,11 @@ public class MailboxGUI extends BasePaginationPage {
         // Execute commands if any (only once). Decided by the executed flag rather than by the first,
         // unread click: when the executed marker could not be written, no command ran and the reader
         // was told to read the mail again - which has to retry here too (UltiKits/UltiMail#31).
+        // This is an inventory click handler, so the commands run on the next tick: a command body runs
+        // at the moment it is dispatched (UltiTools-Reborn#541), and an attached command that opens or
+        // closes an inventory must not do that inside the click event (UltiKits/UltiMail#43).
         if (mail.hasCommands() && !mail.isCommandsExecuted()) {
-            mailService.executeMailCommands(player, mail);
+            mailService.executeMailCommandsDeferred(player, mail);
         }
         
         // Try to claim items if has unclaimed items

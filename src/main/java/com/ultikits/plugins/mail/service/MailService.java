@@ -429,9 +429,10 @@ public class MailService {
      * handed the items over first and only logged a failed write, and because {@link #getInbox}
      * re-reads the table on every command the same attachment could then be claimed again at once
      * (UltiKits/UltiMail#31). On a failed write the in-memory flag is restored, nothing is handed over,
-     * and the result tells the caller so. Both write failures are caught: {@code update}'s declared
-     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
-     * backends throw on any SQL error. On the JSON storage backend a write only reaches an in-memory
+     * and the result tells the caller so. A failed write is caught: the unchecked
+     * {@link DataAccessException} the relational backends throw on any SQL error ({@code updateCounted}
+     * wraps the {@code IllegalAccessException} that {@code update} declares in one), and a write that
+     * matches no stored row is a failure too (UltiKits/UltiMail#44). On the JSON storage backend a write only reaches an in-memory
      * cache that a timer flushes to disk, so a disk failure there cannot be seen at claim time - the
      * framework's storage contract, not changed here.
      * <p>
@@ -489,13 +490,22 @@ public class MailService {
     /**
      * Writes a mail's flags and returns {@code null}, or the failure's message instead of throwing:
      * the relational backends throw the unchecked {@link DataAccessException} on any SQL error, and
-     * {@code update} declares {@code IllegalAccessException}.
+     * {@code updateCounted} wraps the {@code IllegalAccessException} that {@code update} declares in one.
+     * <p>
+     * The write goes through {@code updateCounted} because an update of a row that no longer exists writes
+     * nothing and returns normally on every backend (UltiTools-Reborn#558), which {@code update} gives the
+     * caller no way to see. The row can be gone: an administrator or another server on a shared database
+     * removed it while a reader held the mail in an open mailbox. A count of {@code 0} is reported as a
+     * failure, the same as a thrown write, so every caller takes its failure path - a claim hands nothing over,
+     * the attached commands do not run, and the flags are restored (UltiKits/UltiMail#44).
      */
     private String writeFailure(MailData mail) {
         try {
-            dataOperator.update(mail);
+            if (dataOperator.updateCounted(mail) == 0) {
+                return "no stored mail with id " + mail.getId() + " to write to";
+            }
             return null;
-        } catch (IllegalAccessException | DataAccessException e) {
+        } catch (DataAccessException e) {
             return String.valueOf(e.getMessage());
         }
     }
@@ -518,8 +528,57 @@ public class MailService {
      * 附带命令先写入「已执行」标记再执行；标记写入失败则不执行任何命令并提示读者。
      */
     public void executeMailCommands(Player player, MailData mail) {
-        if (!mail.hasCommands() || mail.isCommandsExecuted()) {
+        List<String> commands = recordCommandsExecuted(player, mail);
+        if (commands != null) {
+            dispatchCommands(player, mail, commands);
+        }
+    }
+
+    /**
+     * {@link #executeMailCommands}, with the commands themselves run on the next server tick
+     * (UltiKits/UltiMail#43). For a caller that is itself inside an inventory click handler, as the
+     * mailbox GUI is: since UltiTools-Reborn#541 a module command body runs at the moment it is
+     * dispatched, so an attached command that opens or closes an inventory ({@code /kits}, another
+     * module's menu) would run inside the {@code InventoryClickEvent}, which Paper does not allow.
+     * <p>
+     * Everything that decides whether the commands run is still done in this call, exactly as in
+     * {@link #executeMailCommands}: the commands are parsed and the executed marker is written
+     * <b>before</b> anything is scheduled, and when it cannot be written nothing is scheduled and the
+     * reader is told (UltiKits/UltiMail#31). Only the dispatch loop moves, with its per-command guard and
+     * its rejected-command log line unchanged. When the scheduler refuses the task (the UltiTools plugin that
+     * owns it is disabled, so no server tick is left to run it) no command ran, so the marker is cleared again and the failure logged: the mail's commands
+     * run when it is read again, rather than being recorded as run and lost.
+     * <p>
+     * 与 {@link #executeMailCommands} 相同，但命令本身推迟到下一个服务器 tick 执行，供在背包点击处理中调用。
+     *
+     * @param player the reader the commands run for
+     * @param mail   the mail whose attached commands are run
+     */
+    public void executeMailCommandsDeferred(Player player, MailData mail) {
+        List<String> commands = recordCommandsExecuted(player, mail);
+        if (commands == null) {
             return;
+        }
+        try {
+            Bukkit.getScheduler().runTask(bukkitPlugin, () -> dispatchCommands(player, mail, commands));
+        } catch (RuntimeException e) {
+            mail.setCommandsExecuted(false);
+            // Best effort: if this reset write fails too, the stored flag stays set and the line logged below
+            // is the only trace.
+            writeFailure(mail);
+            plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
+        }
+    }
+
+    /**
+     * Parses a mail's attached commands and writes the executed marker, before any command runs.
+     *
+     * @return the commands to run, or {@code null} when there is nothing to run or the marker could not be
+     *         written (the failure is logged and, for an unwritable marker, the reader is told)
+     */
+    private List<String> recordCommandsExecuted(Player player, MailData mail) {
+        if (!mail.hasCommands() || mail.isCommandsExecuted()) {
+            return null;
         }
 
         List<String> commands;
@@ -527,10 +586,10 @@ public class MailService {
             commands = GSON.fromJson(mail.getCommands(), STRING_LIST_TYPE);
         } catch (RuntimeException e) {
             plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", String.valueOf(e.getMessage())));
-            return;
+            return null;
         }
         if (commands == null || commands.isEmpty()) {
-            return;
+            return null;
         }
 
         mail.setCommandsExecuted(true);
@@ -539,9 +598,13 @@ public class MailService {
             mail.setCommandsExecuted(false);
             plugin.getLogger().error(plugin.i18n("log_mail_commands_failed").replace("{ERROR}", failure));
             player.sendMessage(ChatColor.RED + plugin.i18n("mail_commands_not_recorded"));
-            return;
+            return null;
         }
+        return commands;
+    }
 
+    /** Runs the commands in order, each in its own guard, once the marker is written. */
+    private void dispatchCommands(Player player, MailData mail, List<String> commands) {
         for (String command : commands) {
             // Everything per command is inside the guard - a null entry from an API caller included - so
             // one bad entry can neither stop the commands after it nor escape after the marker was
@@ -598,10 +661,13 @@ public class MailService {
      * <p>
      * A write the storage cannot make is caught, logged with {@code log_update_mail_failed} and
      * reported as not recorded, and the mail keeps the flags it had, so it is still there and can be
-     * deleted again. Both write failures are caught: {@code update}'s declared
-     * {@code IllegalAccessException} and the unchecked {@link DataAccessException} the relational
-     * backends throw on any SQL error, which used to escape and abort {@code /mail delete},
-     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38).
+     * deleted again. A failed write is caught: the unchecked {@link DataAccessException} the relational
+     * backends throw on any SQL error ({@code updateCounted} wraps the {@code IllegalAccessException} that
+     * {@code update} declares in one), which used to escape and abort {@code /mail delete},
+     * {@code delall} and {@code delread} part-way (UltiKits/UltiMail#38). A write that matches no stored
+     * row is a failure too: the mail is already gone, which is reported as not recorded rather than
+     * special-cased, because every delete path re-reads the inbox in the same command, so this only
+     * happens when another writer removes the row between that read and this write (UltiKits/UltiMail#44).
      * <p>
      * 存储无法写入时记录日志并返回「未记录」，邮件保持原状态，不再抛出异常中断命令。
      *

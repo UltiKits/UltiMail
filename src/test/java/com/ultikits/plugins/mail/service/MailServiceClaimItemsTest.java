@@ -31,6 +31,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Hand-over tests for {@link MailService#claimItems}.
@@ -69,6 +71,8 @@ class MailServiceClaimItemsTest {
         DataOperator<MailData> operator = mock(DataOperator.class);
         dataOperator = operator;
         lenient().when(plugin.getDataOperator(any())).thenReturn((DataOperator) dataOperator);
+        // A write that matched its stored row (UltiTools-Reborn#558: updateCounted returns the row count).
+        lenient().when(dataOperator.updateCounted(any(MailData.class))).thenReturn(1);
 
         mailService = new MailService();
         TestHelper.injectField(mailService, "plugin", plugin);
@@ -209,7 +213,7 @@ class MailServiceClaimItemsTest {
     @DisplayName("the claimed flag cannot be written (unchecked database error): nothing is given and the mail stays claimable")
     void aFailedClaimedWriteGivesNothing() throws Exception {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
-        doThrow(new DataAccessException("connection lost")).when(dataOperator).update(any(MailData.class));
+        doThrow(new DataAccessException("connection lost")).when(dataOperator).updateCounted(any(MailData.class));
 
         MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
@@ -224,13 +228,39 @@ class MailServiceClaimItemsTest {
     @DisplayName("the claimed flag cannot be written (IllegalAccessException): nothing is given and the mail stays claimable")
     void aCheckedFailureOfTheClaimedWriteGivesNothing() throws Exception {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
-        doThrow(new IllegalAccessException("field not accessible")).when(dataOperator).update(any(MailData.class));
+        doThrow(new DataAccessException(com.ultikits.ultitools.exceptions.ErrorCode.DATA_ENTITY_INVALID, "Failed to access entity fields", new IllegalAccessException("field not accessible"))).when(dataOperator).updateCounted(any(MailData.class));
 
         MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
         assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
         assertThat(countInInventory(Material.DIAMOND)).isZero();
         assertThat(mail.isClaimed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("the stored row is gone (no row matched the write): nothing is given, the mail stays unclaimed, and the failure is logged (UltiMail#44)")
+    void aClaimOfAGoneRowGivesNothing() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+        when(dataOperator.updateCounted(any(MailData.class))).thenReturn(0);
+
+        MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
+
+        assertThat(result.getStatus()).isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
+        assertThat(result.getItems()).isEmpty();
+        assertThat(countInInventory(Material.DIAMOND)).isZero();
+        assertThat(countDropped(Material.DIAMOND)).isZero();
+        assertThat(mail.isClaimed()).isFalse();
+        verify(TestHelper.getMockPlugin().getLogger()).error(org.mockito.ArgumentMatchers.contains("log_claim_failed"));
+    }
+
+    @Test
+    @DisplayName("control: the same claim with its row present (count 1) hands the attachment over")
+    void aClaimOfAPresentRowGivesTheItems() throws Exception {
+        MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
+
+        assertThat(mailService.claimAttachment(mail, receiver).getStatus())
+                .isEqualTo(MailService.ClaimResult.Status.CLAIMED);
+        assertThat(countInInventory(Material.DIAMOND)).isEqualTo(2);
     }
 
     @Test
@@ -242,8 +272,8 @@ class MailServiceClaimItemsTest {
         doAnswer(inv -> {
             diamondsAtWrite.add(countInInventory(Material.DIAMOND));
             claimedAtWrite.add(((MailData) inv.getArgument(0)).isClaimed());
-            return null;
-        }).when(dataOperator).update(any(MailData.class));
+            return 1;
+        }).when(dataOperator).updateCounted(any(MailData.class));
 
         MailService.ClaimResult result = mailService.claimAttachment(mail, receiver);
 
@@ -257,8 +287,8 @@ class MailServiceClaimItemsTest {
     @DisplayName("across a failed write the attachment is handed over exactly once")
     void theAttachmentIsHandedOverExactlyOnce() throws Exception {
         MailData mail = mailCarrying(new ItemStack(Material.DIAMOND, 2));
-        doThrow(new DataAccessException("connection lost")).doNothing()
-                .when(dataOperator).update(any(MailData.class));
+        doThrow(new DataAccessException("connection lost")).doReturn(1)
+                .when(dataOperator).updateCounted(any(MailData.class));
 
         assertThat(mailService.claimAttachment(mail, receiver).getStatus())
                 .isEqualTo(MailService.ClaimResult.Status.NOT_RECORDED);
@@ -285,7 +315,7 @@ class MailServiceClaimItemsTest {
         assertThat(legacy.getReturnType()).isEqualTo(ItemStack[].class);
 
         MailData refused = mailCarrying(new ItemStack(Material.DIAMOND, 2));
-        doThrow(new DataAccessException("connection lost")).doNothing().when(dataOperator).update(any(MailData.class));
+        doThrow(new DataAccessException("connection lost")).doReturn(1).when(dataOperator).updateCounted(any(MailData.class));
         assertThat(mailService.claimItems(refused, receiver)).isEmpty();
         assertThat(countInInventory(Material.DIAMOND)).isZero();
         assertThat(refused.isClaimed()).isFalse();

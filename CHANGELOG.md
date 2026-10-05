@@ -33,6 +33,46 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A mail change whose stored row has been removed in the meantime is now reported as not saved, on every storage
+  type. If an administrator deleted a mail from storage, or another server on a shared database did, while a
+  player had the mailbox open, clicking that mail still marked the claim as saved and handed over the attachment
+  (and ran its attached commands) from a mail that no longer existed. Now the claim is refused with `Your claim
+  could not be recorded, so nothing was given. Please try again.`, the attached commands do not run, and the
+  failure is logged; marking a mail read and deleting a mail log it the same way. Before, only the JSON storage
+  reported a missing row, with an error (UltiKits/UltiMail#44).
+- 邮件的存储行在此期间被移除时，对该邮件的改动现在在所有存储类型上都按“未保存”处理。此前若管理员或共享数据库上的另一台服务器在玩家打开
+  收件箱期间删除了某封邮件，点击该邮件仍会记为已领取，并从已不存在的邮件里发放附件、执行附带命令。现在领取会被拒绝
+  （`Your claim could not be recorded, so nothing was given. Please try again.`），附带命令不会执行，并记录日志；标记已读和删除邮件
+  同样记录日志。此前只有 JSON 存储会报告缺行，并且报的是错误（UltiKits/UltiMail#44）。
+- A mail's attached commands now run on the server tick after you click the mail in the mailbox (`/mail read`)
+  instead of inside the click. The framework now runs a command at the moment it is dispatched, so an attached
+  command that opens or closes a GUI (`/kits`, another module's menu, `/mail sentgui`) would otherwise have run
+  inside the click event, which Paper does not allow, and could fail or leave the mailbox in a broken state.
+  The mail is still recorded as run before anything runs, a command that fails is still logged and does not
+  stop the ones after it, and the commands still run in their written order and only once. The attachment
+  claim in the same click now happens first, so an attached command that gives items can no longer take the
+  inventory slots the claim needs. `/mail read <number>`
+  typed as a command is unchanged (UltiKits/UltiMail#43).
+- 在收件箱（`/mail read`）中点击邮件时，邮件附带的命令现在在点击之后的下一个服务器 tick 执行，而不是在点击事件内执行。
+  框架现在在命令被派发的当下就运行它，因此会开关界面的附带命令（`/kits`、其他模块的菜单、`/mail sentgui`）
+  原本会在点击事件内执行，Paper 不允许这样做，可能失败或让收件箱处于异常状态。邮件仍然先于任何命令被记录为已执行，
+  失败的命令仍会记录日志且不会中断后面的命令，命令仍按书写顺序且只执行一次。同一次点击中的附件领取现在先于命令执行，
+  因此发放物品的附带命令不会再占用领取所需的背包格子。以命令形式输入的 `/mail read <序号>`
+  不变（UltiKits/UltiMail#43）。
+- `config/mail.yml` now writes its comments in the server's language. Twenty comments (every setting in the
+  file) used to be Chinese-only, so a fresh install under `language: en` got a file with Chinese comments.
+  Each is now a language-file key that the framework resolves in the server's `language` every time it
+  writes the file, with an English and a Chinese entry in `lang/en.yml` and `lang/zh.yml`. On an existing
+  server the comments the framework wrote on these twenty settings, the Chinese ones earlier versions wrote
+  included, switch to the server's language at the next start, and after you change `language` and run
+  a bare `/ul reload`; values are untouched, and a comment you wrote yourself is kept as you wrote it
+  (UltiKits/UltiTools-Reborn#611) (UltiKits/UltiMail#42).
+- `config/mail.yml` 的注释现在跟随服务器语言。此前有二十条注释（文件中的每个设置）只有中文，`language: en`
+  的全新安装得到的文件注释是中文。现在每条注释都是一个语言文件键，框架每次写入文件时按服务器的 `language` 解析，
+  `lang/en.yml` 与 `lang/zh.yml` 各有英文和中文条目。已有服务器上框架在这二十个设置上写下的注释（包括旧版本写下的中文注释）
+  会在下次启动时、以及你修改 `language` 并执行不带参数的 `/ul reload` 后切换为服务器语言；设置值不受影响，你自己写的注释保持原样
+  （UltiKits/UltiTools-Reborn#611）（UltiKits/UltiMail#42）。
+
 - The attachment selector (`/sendmail <player> <subject> attach` for a sender with
   `ultimail.admin.multiattach`) now takes items by shift-click from your own inventory, into the first
   free attachment slot, and by dragging into the attachment area; before, both were refused and only a
@@ -221,8 +261,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   effect: nothing read them, so editing them never changed what a player saw. The unread-mail
   notification on join and the confirmation a sender gets after sending already take their text
   from this module's language file, entries `notify_new_mail` and `mail_sent_success` in
-  `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting
-  and are customised there. Their placeholders differ from the removed keys': `notify_new_mail`
+  `lang/<language>.yml` beside the `config` folder, so they follow the server's `language` setting.
+  To customise them, copy the official language file to one whose name starts with its language code and
+  a hyphen (for example `lang/en-myserver.yml`), edit the entries there and set `language: en-myserver` in
+  `plugins/UltiTools/config.yml`; an edit made in the official file itself is restored at the next start or module reload,
+  the edited file kept as `.bak` (UltiKits/UltiTools-Reborn#616). Their placeholders differ from the removed keys': `notify_new_mail`
   carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
   name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
   the framework, which then uses the bundled text. The join notification does not yet put the
@@ -230,7 +273,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   for the message an online receiver gets when a mail arrives, is read and stays. A server upgraded
   from an earlier version keeps both removed keys in its `mail.yml`; while either is there, the
   module logs one warning for it at startup and on every reload of this module, naming the file,
-  the key and the language entry to edit instead, and the key can simply be deleted
+  the key and the language entry that now holds the text, and the key can simply be deleted
   (UltiKits/UltiMail#23).
 - 移除本模块在卸载与重载时输出的"UltiMail 已禁用！"与"UltiMail 配置已重载！"控制台行，以及未被使用的
   `mail_disabled`、`mail_reloaded` 语言键。UltiTools 6.3.0 会为每个模块输出一行重载日志
@@ -244,10 +287,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 移除 `config/mail.yml` 中的 `messages.new-mail` 与 `messages.mail-sent` 设置项。二者都从未生效：没有任何代码
   读取它们，修改它们从未改变玩家看到的内容。玩家登录时的未读邮件提醒，以及发送者发出邮件后收到的确认消息，
   本来就从本模块的语言文件读取文本——`config` 文件夹旁 `lang/<语言>.yml` 中的 `notify_new_mail` 与
-  `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置，也应在那里修改。这两个条目的占位符与被移除的
+  `mail_sent_success` 条目——因此会跟随服务器的 `language` 设置。要自定义它们，请把官方语言文件复制为以其语言代码加连字符开头的文件
+  （例如 `lang/zh-myserver.yml`），在副本中修改这些条目，并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver`；
+  直接修改官方文件的改动会在下次启动或模块重载时被恢复，修改过的文件保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。这两个条目的占位符与被移除的
   键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
   （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
   填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
   同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
   服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
-  为它记录一条警告，指出文件、键名以及应改为修改的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
+  为它记录一条警告，指出文件、键名以及现在保存该文本的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
