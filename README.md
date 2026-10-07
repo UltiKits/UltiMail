@@ -79,26 +79,30 @@ new_mail_message: "&e[邮件] &f你有 &a{COUNT} &f封未读邮件！"
 
 ## ⚠️ Known limitations / 已知限制
 
-**`messages: {}` adds two extra WARNINGs.** UltiMail ships a default for `messages.mail-received` in
-`config/mail.yml`. If you deliberately write the whole `messages` section as an empty value (`messages: {}`),
-the file is never changed: UltiMail runs on its default text, and the log shows three WARNINGs instead of one.
+**`messages: {}` adds two extra WARNINGs (non-`zh` servers).** UltiMail ships a default for
+`messages.mail-received` in `config/mail.yml`. If you deliberately write the whole `messages` section as an
+explicit empty value (`messages: {}`, `messages: ~` or `messages: null`), the file is never changed: UltiMail runs
+on its default text, and on a server whose `language` is not `zh` the log shows three WARNINGs instead of one.
 The first is the framework's own ("the section messages is written as an explicit empty value, which the
 framework does not change"). The other two come from UltiMail's own start-up save, which the framework declines:
 "the module's changes to 'messages.mail-received' were not written ..." when the server starts, and
 "... holds module UltiMail changes that were never saved; they are not written and are dropped ..." when the
-server stops. Nothing is lost and nothing is overwritten. To have the defaults put back, leave the line ending
-after the colon (`messages:`, with no value), or write the keys you want under it (`mail-received: ...`); to stay
-quiet, do not write an empty value for a section that has defaults. This is documented rather than worked around
-in code because it only occurs when an operator writes an explicit empty value on purpose
-(UltiKits/UltiMail#48).
+server stops. On a `zh` server the default text already equals the server-language text, so UltiMail has nothing
+to save and only the framework's single WARNING appears. Nothing is lost and nothing is overwritten. To have the
+defaults put back, leave the line ending after the colon (`messages:` and nothing else; `~` and `null` count as
+an explicit empty value), or write the keys you want under it (`mail-received: ...`); to stay quiet, do not
+write an empty value for a section that has defaults. This is documented rather than worked around in code
+because it only occurs when an operator writes an explicit empty value on purpose (UltiKits/UltiMail#48).
 
-**`messages: {}` 会多出两条 WARNING。** UltiMail 在 `config/mail.yml` 中为 `messages.mail-received` 提供默认值。
-若你特意把整个 `messages` 段写成空值（`messages: {}`），文件不会被改动：UltiMail 使用默认文本，日志中会出现三条
+**`messages: {}` 会多出两条 WARNING（仅限 `language` 不是 `zh` 的服务器）。** UltiMail 在 `config/mail.yml` 中为
+`messages.mail-received` 提供默认值。若你特意把整个 `messages` 段写成显式空值（`messages: {}`、`messages: ~` 或
+`messages: null`），文件不会被改动：UltiMail 使用默认文本。服务器 `language` 不是 `zh` 时，日志中会出现三条
 WARNING 而不是一条。第一条来自框架（"该段被写成显式空值，框架不会更改它"）；另外两条来自 UltiMail 自己的启动保存被框架
 拒绝："模块对 'messages.mail-received' 的更改未写入"（服务器启动时），以及服务器停止时的"有从未保存的
-更改，将被丢弃"。不会丢失任何内容，也不会覆盖你的配置。想让默认值被补回，请让该行在冒号后结束（`messages:`，不写值），
-或在其下写出你想要的键（`mail-received: ...`）；想避免这些警告，请不要为带有默认值的段写空值。这只在运维人员有意写下
-显式空值时出现，因此只在文档中说明，不在代码中绕过（UltiKits/UltiMail#48）。
+更改，将被丢弃"。`language` 为 `zh` 时，默认文本本身就是服务器语言的文本，UltiMail 无需保存，只会出现框架的一条
+WARNING。不会丢失任何内容，也不会覆盖你的配置。想让默认值被补回，请让该行在冒号后结束（`messages:` 后不写任何内容；
+`~` 和 `null` 同样算显式空值），或在其下写出你想要的键（`mail-received: ...`）；想避免这些警告，请不要为带有默认值的段
+写空值。这只在运维人员有意写下显式空值时出现，因此只在文档中说明，不在代码中绕过（UltiKits/UltiMail#48）。
 
 ## 🖼️ GUI 预览
 
