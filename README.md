@@ -1,8 +1,8 @@
 # UltiMail
 
-[![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.2.1-blue)](https://github.com/UltiKits/UltiTools-Reborn)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.8--1.21-green)](https://www.spigotmc.org/)
-[![Java](https://img.shields.io/badge/Java-8+-orange)](https://www.java.com/)
+[![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.3.0%2B-blue)](https://github.com/UltiKits/UltiTools-Reborn)
+[![Paper](https://img.shields.io/badge/Paper-1.21%2B-green)](https://papermc.io/)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 
 UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模块，支持玩家之间发送邮件、附带物品，以及管理员群发功能。
 
@@ -53,7 +53,7 @@ UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模�
 
 ## 📦 安装
 
-1. 确保服务器已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.2.1+
+1. 确保服务器已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.3.0+（本模块声明 `api-version: 630`，更早的框架会拒绝加载它；仅支持 Paper 1.21+、Java 21+）
 2. 将 `UltiMail-1.1.0.jar` 放入 `plugins/UltiTools/plugins/` 目录
 3. 重启服务器或使用 `/ul reload` 重载插件
 
@@ -279,7 +279,7 @@ UltiMail/
 <dependency>
     <groupId>com.ultikits</groupId>
     <artifactId>UltiTools-API</artifactId>
-    <version>6.2.1</version>
+    <version>6.3.0</version>
     <scope>provided</scope>
 </dependency>
 ```
@@ -287,6 +287,16 @@ UltiMail/
 ## 📝 更新日志
 
 ### v1.1.0
+
+本仓库首个也是唯一一个发布版本（2026-02-18）。仓库从初始提交起即为 1.1.0，从未发布过 1.0.0；下面 v1.1.0 与 v1.0.0
+两节列表在初始提交中即已存在，合起来就是 1.1.0 包含的内容，并不对应两次发布。这个版本号是在模块版本号规范
+（UltiKits/UltiTools-Dev-Doc#7、#12）落地之前定的，规范从下一版起适用（UltiKits/UltiMail#7）。
+
+The first and only release of this repository (2026-02-18). The repository has been at 1.1.0 since its initial commit
+and no 1.0.0 was ever published; the v1.1.0 and v1.0.0 lists below were already in that initial commit and together
+describe what 1.1.0 contains, not two releases. The number predates the module version rules
+(UltiKits/UltiTools-Dev-Doc#7, #12), which apply from the next release on (UltiKits/UltiMail#7).
+
 - ✅ 新增收件箱/发件箱 GUI
 - ✅ 新增群发邮件功能
 - ✅ 新增批量删除命令 (delall, delread)
@@ -295,7 +305,7 @@ UltiMail/
 - ✅ 管理员支持多物品附件
 - ✅ 完善 i18n 国际化
 
-### v1.0.0
+### v1.0.0（未发布 / never published）
 
 - 🎉 初始版本
 - 基础邮件收发功能

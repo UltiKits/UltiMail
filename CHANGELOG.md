@@ -9,6 +9,32 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- This version requires UltiTools 6.3.0 or later and declares `api-version: 630` in `plugin.yml` (it was
+  `621`). Frameworks 6.2.1 to 6.2.5 accepted the old declaration although this module calls
+  `DataOperator.updateCounted`, which those versions do not have; they now refuse the module at load with a
+  warning that the UltiTools version is outdated, naming `UltiMail`. The README's framework minimum
+  and its server and Java badges now say UltiTools 6.3.0+, Paper 1.21+ and Java 21+
+  (UltiKits/UltiMail#7, UltiKits/UltiTools-Reborn#544).
+- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（原为 `621`）。本模块此前就已需要
+  6.3.0：6.2.1 至 6.2.5 的框架此前会接受旧声明，但本模块调用的 `DataOperator.updateCounted` 在这些版本中不存在；
+  现在它们会在加载时拒绝本模块，并给出点名 `UltiMail` 的"UltiTools 版本过旧"警告。
+  README 中的框架最低版本以及服务端与 Java 徽章已改为 UltiTools 6.3.0+、Paper 1.21+、Java 21+
+  （UltiKits/UltiMail#7、UltiKits/UltiTools-Reborn#544）。
+- `plugin.yml` now declares `identify-string: ultimail`, the key of this module's entry in the UltiCloud
+  catalogue. The framework's update check and `/upm update` skip a module that does not declare it, so this
+  module now takes part in both: a later published version carrying the same key is reported at startup and
+  can be installed with `/upm update` (UltiKits/UltiTools-Reborn#474).
+- `plugin.yml` 现在声明 `identify-string: ultimail`，即本模块在 UltiCloud 模块目录中的条目键。框架的更新检查和
+  `/upm update` 会跳过未声明该键的模块，因此本模块现在会参与两者：带有同一键的更高发布版本会在启动时提示，
+  并可用 `/upm update` 安装（UltiKits/UltiTools-Reborn#474）。
+- The next published version raises `api-version` from `620` (as 1.1.0 was released) to `630`. Under the
+  module version rules (UltiKits/UltiTools-Dev-Doc#7 and #12) that is a major change, because the server owner
+  must upgrade UltiTools before swapping the JAR; its number is chosen when it is released. Why 1.1.0 carries
+  its number is recorded under 1.1.0 below (UltiKits/UltiMail#7).
+- 下一个发布版本会把 `api-version` 从 `620`（1.1.0 发布时的声明）提高到 `630`。按模块版本号规范
+  （UltiKits/UltiTools-Dev-Doc#7 与 #12），服主须先升级 UltiTools 才能换 JAR，因此属于主版本变更；其版本号在发布时确定。
+  1.1.0 这个版本号的由来记在下方 1.1.0 一节（UltiKits/UltiMail#7）。
+
 - Message and title settings in `config/mail.yml` — the new-mail notice (`messages.mail-received`), the
   server name recall mails carry (`recall.server-name`), and the recall mail and email texts
   (`recall.subject`, `recall.content`, `email.recall-subject`, `email.recall-content`) — are written in the
@@ -296,3 +322,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
   服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
   为它记录一条警告，指出文件、键名以及现在保存该文本的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
+
+## [1.1.0] - 2026-02-18
+
+- First and only release of this repository. The repository has been at `1.1.0` since its initial commit, and
+  no 1.0.0 was ever published from it, so the number does not mark a step from an earlier release. It was
+  chosen before the module version rules (UltiKits/UltiTools-Dev-Doc#7 and #12) were written; those rules apply
+  from the next release on (UltiKits/UltiMail#7). This release declared `api-version: 620`, although its JAR
+  already used framework methods that exist only from UltiTools 6.2.1. The README's update log lists what it
+  contains.
+- 本仓库首个也是唯一一个发布版本。仓库从初始提交起即为 `1.1.0`，从未发布过 1.0.0，因此这个版本号并不表示相对某个更早
+  发布的升级。它是在模块版本号规范（UltiKits/UltiTools-Dev-Doc#7 与 #12）落地之前定的；规范从下一版起适用
+  （UltiKits/UltiMail#7）。该版本声明的是 `api-version: 620`，但其 JAR 已经使用了 UltiTools 6.2.1 起才有的框架方法。
+  其包含的功能见 README 的更新日志。
