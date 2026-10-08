@@ -287,6 +287,16 @@ UltiMail/
 ## 📝 更新日志
 
 ### v1.1.0
+
+本仓库首个也是唯一一个发布版本（2026-02-18）。仓库从初始提交起即为 1.1.0，从未发布过 1.0.0；下面 v1.1.0 与 v1.0.0
+两节列表在初始提交中即已存在，合起来就是 1.1.0 包含的内容，并不对应两次发布。这个版本号是在模块版本号规范
+（UltiKits/UltiTools-Dev-Doc#7、#12）落地之前定的，规范从下一版起适用（UltiKits/UltiMail#7）。
+
+The first and only release of this repository (2026-02-18). The repository has been at 1.1.0 since its initial commit
+and no 1.0.0 was ever published; the v1.1.0 and v1.0.0 lists below were already in that initial commit and together
+describe what 1.1.0 contains, not two releases. The number predates the module version rules
+(UltiKits/UltiTools-Dev-Doc#7, #12), which apply from the next release on (UltiKits/UltiMail#7).
+
 - ✅ 新增收件箱/发件箱 GUI
 - ✅ 新增群发邮件功能
 - ✅ 新增批量删除命令 (delall, delread)
@@ -295,7 +305,7 @@ UltiMail/
 - ✅ 管理员支持多物品附件
 - ✅ 完善 i18n 国际化
 
-### v1.0.0
+### v1.0.0（未发布 / never published）
 
 - 🎉 初始版本
 - 基础邮件收发功能
