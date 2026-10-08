@@ -9,6 +9,31 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- This version requires UltiTools 6.3.0 or later and declares `api-version: 630` in `plugin.yml` (it was
+  `621`). The module already needed 6.3.0, so an older framework now refuses it with a warning that the
+  UltiTools version is outdated, naming `UltiMail`, instead of loading it. The README's framework minimum
+  and its server and Java badges now say UltiTools 6.3.0+, Paper 1.21+ and Java 21+
+  (UltiKits/UltiMail#7, UltiKits/UltiTools-Reborn#544).
+- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（原为 `621`）。本模块此前就已需要
+  6.3.0，因此更早的框架现在会拒绝加载它，并给出"UltiTools 版本过旧"的警告（其中点名 `UltiMail`），而不是加载后出错。
+  README 中的框架最低版本以及服务端与 Java 徽章已改为 UltiTools 6.3.0+、Paper 1.21+、Java 21+
+  （UltiKits/UltiMail#7、UltiKits/UltiTools-Reborn#544）。
+- `plugin.yml` now declares `identify-string: ultimail`, the key of this module's entry in the UltiCloud
+  catalogue. The framework's update check and `/upm update` skip a module that does not declare it, so this
+  module now takes part in both: a later published version carrying the same key is reported at startup and
+  can be installed with `/upm update` (UltiKits/UltiTools-Reborn#474).
+- `plugin.yml` 现在声明 `identify-string: ultimail`，即本模块在 UltiCloud 模块目录中的条目键。框架的更新检查和
+  `/upm update` 会跳过未声明该键的模块，因此本模块现在会参与两者：带有同一键的更高发布版本会在启动时提示，
+  并可用 `/upm update` 安装（UltiKits/UltiTools-Reborn#474）。
+- About the version number: `1.1.0` is this repository's first and only release; the number was chosen before
+  the module version rules (UltiKits/UltiTools-Dev-Doc#7 and #12) were written, and there is no new feature
+  behind it. The rules apply from the next release on. A raised `api-version` means the server owner must
+  upgrade UltiTools before swapping the JAR, which those rules count as a major change; the version number is
+  not changed here (UltiKits/UltiMail#7).
+- 关于版本号：`1.1.0` 是本仓库唯一的一次发布；这个号是在模块版本号规范（UltiKits/UltiTools-Dev-Doc#7 与 #12）
+  落地之前定的，其中并无对应的新功能，规范从下一版起适用。`api-version` 抬高意味着服主要先升级 UltiTools 才能换 JAR，
+  按规范属于主版本变更；本次不改动版本号（UltiKits/UltiMail#7）。
+
 - Message and title settings in `config/mail.yml` — the new-mail notice (`messages.mail-received`), the
   server name recall mails carry (`recall.server-name`), and the recall mail and email texts
   (`recall.subject`, `recall.content`, `email.recall-subject`, `email.recall-content`) — are written in the
