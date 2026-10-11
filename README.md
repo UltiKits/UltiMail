@@ -104,6 +104,10 @@ WARNING。不会丢失任何内容，也不会覆盖你的配置。想让默认�
 `~` 和 `null` 同样算显式空值），或在其下写出你想要的键（`mail-received: ...`）；想避免这些警告，请不要为带有默认值的段
 写空值。这只在运维人员有意写下显式空值时出现，因此只在文档中说明，不在代码中绕过（UltiKits/UltiMail#48）。
 
+UltiMail requires Minecraft 1.21 or later (Paper 1.21+), even though the UltiTools-API 6.3.0 framework itself runs on Paper 1.19.2 build 163 or later. On Paper 1.19.2–1.20.6, the module can load, but the mail attachment GUI fails with `IncompatibleClassChangeError`: `InventoryView` became an interface in Minecraft 1.21, and framework-loaded modules do not receive Paper's bytecode rewriting. Run this module on Paper 1.21 or later. Backward compatibility is tracked in [UltiKits/UltiTools-Reborn#655](https://github.com/UltiKits/UltiTools-Reborn/issues/655).
+
+UltiMail 需要 Minecraft 1.21 或更高版本（Paper 1.21+），即使 UltiTools-API 6.3.0 框架本身可运行于 Paper 1.19.2 build 163 或更高版本。在 Paper 1.19.2–1.20.6 上，模块可能成功加载，但邮件附件界面会出现 `IncompatibleClassChangeError`：`InventoryView` 在 Minecraft 1.21 中由类变为接口，而由框架加载的模块不会经过 Paper 的字节码改写。请在 Paper 1.21 或更高版本上运行本模块。向下兼容工作由 [UltiKits/UltiTools-Reborn#655](https://github.com/UltiKits/UltiTools-Reborn/issues/655) 跟踪。
+
 ## 🖼️ GUI 预览
 
 ### 收件箱 GUI
