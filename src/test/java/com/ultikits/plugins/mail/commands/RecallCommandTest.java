@@ -498,6 +498,37 @@ class RecallCommandTest {
     // ==================== getAllRegisteredPlayers (private) Tests ====================
 
     @Nested
+    @DisplayName("/recall <message...> takes a multi-word custom message (UltiTools 6.3.0 Phase 19, D19-135)")
+    class CustomMessageTests {
+
+        @Test
+        @DisplayName("the custom-message mapping is the framework's varargs form, so every word after /recall is collected")
+        void theMappingIsVarargs() throws Exception {
+            Method method = RecallCommand.class.getDeclaredMethod("sendRecallWithMessage", CommandSender.class, String[].class);
+            com.ultikits.ultitools.annotations.command.CmdMapping mapping =
+                    method.getAnnotation(com.ultikits.ultitools.annotations.command.CmdMapping.class);
+            assertThat(mapping.format()).isEqualTo("<message...>");
+        }
+
+        @Test
+        @DisplayName("a multi-word custom message reaches the offline player's mailbox intact, words joined by single spaces")
+        void aMultiWordMessageReachesTheMailbox() {
+            OfflinePlayer offlinePlayer = mock(OfflinePlayer.class);
+            when(offlinePlayer.getUniqueId()).thenReturn(UUID.randomUUID());
+            when(offlinePlayer.getName()).thenReturn("OfflineGuy");
+            mockedBukkit.when(Bukkit::getOfflinePlayers).thenReturn(new OfflinePlayer[]{offlinePlayer});
+            @SuppressWarnings("unchecked")
+            DataOperator<MailData> mailOp = mock(DataOperator.class);
+            when(mailOp.getAll()).thenReturn(new ArrayList<>());
+            when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailOp);
+
+            recallCommand.sendRecallWithMessage(adminPlayer, new String[]{"A", "custom", "homecoming", "message"});
+
+            verify(mailOp).insert(argThat(mail -> "A custom homecoming message".equals(((MailData) mail).getContent())));
+        }
+    }
+
+    @Nested
     @DisplayName("getAllRegisteredPlayers 私有方法测试")
     class GetAllRegisteredPlayersTests {
 
@@ -928,7 +959,7 @@ class RecallCommandTest {
             when(mailOp.getAll()).thenReturn(new ArrayList<>());
             when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailOp);
 
-            recallCommand.sendRecallWithMessage(adminPlayer, "服务器更新了");
+            recallCommand.sendRecallWithMessage(adminPlayer, new String[]{"服务器更新了"});
 
             verify(mailOp).insert(argThat(mail -> {
                 MailData m = (MailData) mail;
@@ -1221,7 +1252,7 @@ class RecallCommandTest {
         @Test
         @DisplayName("应该支持带自定义消息的召回命令")
         void shouldSupportCustomMessageFormat() throws Exception {
-            RecallCommand.class.getDeclaredMethod("sendRecallWithMessage", CommandSender.class, String.class);
+            RecallCommand.class.getDeclaredMethod("sendRecallWithMessage", CommandSender.class, String[].class);
         }
     }
 
@@ -1274,7 +1305,7 @@ class RecallCommandTest {
             when(mailOp.getAll()).thenReturn(new ArrayList<>());
             when(mockPlugin.getDataOperator(MailData.class)).thenReturn(mailOp);
 
-            recallCommand.sendRecallWithMessage(adminPlayer, "自定义消息");
+            recallCommand.sendRecallWithMessage(adminPlayer, new String[]{"自定义消息"});
 
             // Should show email stats line
             verify(adminPlayer, atLeast(1)).sendMessage(ArgumentMatchers.<String>argThat(msg ->
