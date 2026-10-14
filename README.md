@@ -62,7 +62,7 @@ UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模�
 
 ## ⚙️ 配置文件
 
-### 主配置 (`config.yml`)
+### 主配置 (`config/mail.yml`)
 
 ```yaml
 # 是否在玩家登录时通知未读邮件
@@ -278,7 +278,6 @@ UltiMail/
 │   └── service/
 │       └── MailService.java       # 邮件服务
 └── src/main/resources/
-    ├── config.yml                 # 默认配置
     └── lang/
         ├── zh.yml                 # 中文
         └── en.yml                 # 英文
