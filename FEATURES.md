@@ -86,18 +86,22 @@ rather than an error:
    positive exists in this module's source — but the anchored form is still the one used, so the
    same command is trustworthy unmodified against every repository in the fan-out.
 
-**Positive control:** the line-start form returns `@CmdExecutor` = 3, `@CmdMapping` = 17,
+**Positive control:** the line-start form returns `@CmdExecutor` = 3, `@CmdMapping` = 15,
 `@EventListener` = 2 (classes), `@EventHandler` = 5 (handler methods), `@Scheduled` = 0,
 `@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 20, `@Table` = 1
 (`MailData`) — confirmed by reading all 15 source files directly, not by trusting the count
-alone. `MailCommand`'s twelve `@CmdMapping` sites are this module's standing positive control —
+alone. `MailCommand`'s eleven `@CmdMapping` sites are this module's standing positive control —
 the class with the most sub-commands behind one executor, the shape most likely to silently drop
 a row under a naive approach, confirmed present one by one against `MailCommand.java`'s own
 source (`read` line 58, `sentgui` line 66, `inbox` line 73, `sent` line 102, `read <index>` line
-129, `claim <index>` line 164, `delete <index>` line 200, `delall` line 226, `delread` line 235,
-`sendall <content>` line 246, `sendall <content> items` line 254, bare `""` line 274). This
-document's command-row count (18) diverges from the `@CmdMapping` count (17) for one explained
-reason, stated in the `## Recall` section below. This section carries 0 rows against the
+129, `claim <index>` line 164, `delete <index>` line 213, `delall` line 242, `delread` line 252,
+`sendall <content...>` line 277, bare `""` line 320). This document's command-row count (18) diverges
+from the `@CmdMapping` count (15) for three explained reasons: `/recall help`, stated in the `## Recall`
+section below; and two free-text mappings that each serve two rows, because a final flag word selects the
+attachment path (UltiTools-API 6.3.0 Phase 19, maintainer ruling of 2026-10-14; `TrailingFlag`):
+`sendall <content...>` serves `ultimail.mail.broadcast` and `ultimail.mail.broadcast-with-items` (final word
+`items`), and `SendMailCommand`'s `<player> <subject...>` serves `ultimail.sendmail.text` and
+`ultimail.sendmail.attach` (final word `attach`). This section carries 0 rows against the
 reconciliation table's `@Scheduled` = 0 (this module runs no scheduled task at all, and has no
 mail expiry: the `mail-expire-days` key that implied one was removed by `UltiKits/UltiMail#23`,
 and mail expiry is a feature request, `UltiKits/UltiMail#34`).
@@ -110,8 +114,8 @@ under `language: en`), `@CmdTarget(PLAYER)`. Twelve `@CmdMapping` sites, all lis
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultimail.mail.broadcast | Send a text-only mail to every offline/online player at once (admin), progress-reported every 50 recipients, running asynchronously | command | `/mail sendall <content>` | ultimail.admin.sendall | player | admin | brief | MailCommand#sendAll |
-| ultimail.mail.broadcast-with-items | Broadcast mail with attached items selected via `AttachmentSelectorPage`; every recipient's copy carries a CLONE of the same items (not one shared instance) | command | `/mail sendall <content> items` | ultimail.admin.sendall | player | admin | brief | MailCommand#sendAllWithItems |
+| ultimail.mail.broadcast | Send a text-only mail to every offline/online player at once (admin), progress-reported every 50 recipients, running asynchronously | command | `/mail sendall <content>` (several words allowed) | ultimail.admin.sendall | player | admin | brief | MailCommand#sendAllFreeText → #sendAll |
+| ultimail.mail.broadcast-with-items | Broadcast mail with attached items selected via `AttachmentSelectorPage`; every recipient's copy carries a CLONE of the same items (not one shared instance) | command | `/mail sendall <content> items` (several words allowed; the final word `items` selects this path) | ultimail.admin.sendall | player | admin | brief | MailCommand#sendAllFreeText → #sendAllWithItems |
 | ultimail.mail.claim | Claim the item attachments of a specific inbox mail by its listed index, refusing if already claimed, has no items, or the player's inventory lacks enough empty slots. The claim is recorded before the items are handed over; a claim the storage cannot record is refused with `Your claim could not be recorded, so nothing was given. Please try again.` (red), nothing is given, and the mail stays claimable. A write that matches no stored row, because the mail was removed from storage after the reader loaded it, is such a failure too, on every storage type (`UltiKits/UltiMail#44`). On the JSON storage backend a write reaches only an in-memory cache flushed to disk on a timer, so a disk failure there is not seen at claim time | command | `/mail claim <index>` | ultimail.use | player | player | brief | MailCommand#claim |
 | ultimail.mail.delete | Soft-delete a specific inbox mail by index; refuses if it has unclaimed item attachments. A deletion the storage cannot record is logged (`log_update_mail_failed`), the mail stays, and the player is told `delete_not_recorded` instead of `delete_success` (UltiKits/UltiMail#38); a write that matches no stored row, because another writer removed the mail between the inbox read and the write, is a failure here too (`UltiKits/UltiMail#44`) | command | `/mail delete <index>` | ultimail.use | player | player | brief | MailCommand#delete |
 | ultimail.mail.delete-all | Soft-delete every inbox mail with no unclaimed items, reporting the count deleted; a mail whose deletion the storage cannot record stays and is counted in a second, red `delete_batch_not_recorded` line, and the command carries on with the rest (UltiKits/UltiMail#38); a write that matches no stored row counts as not recorded too (`UltiKits/UltiMail#44`) | command | `/mail delall` | ultimail.use | player | player | brief | MailCommand#deleteAll |
@@ -148,13 +152,13 @@ before this method runs at all, so a sender holding only `ultimail.recall` (and 
 
 `SendMailCommand` — class-level `@CmdExecutor(alias = {"sendmail", "sm"}, permission =
 "ultimail.send", description = "command_description_sendmail")` (a language-file key: `Send mail`
-under `language: en`), `@CmdTarget(PLAYER)`. Three `@CmdMapping` sites.
+under `language: en`), `@CmdTarget(PLAYER)`. Two `@CmdMapping` sites.
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
-| ultimail.sendmail.attach | Send mail with an attachment: a sender holding `ultimail.admin.multiattach` gets the multi-item `AttachmentSelectorPage`; an ordinary sender attaches only their main-hand item (removed from their hand immediately, before the content prompt even begins). The attachment is handed back whenever the content prompt ends without the mail being sent, and the return does not depend on WHY it ended: it runs from Bukkit's conversation-abandonment hook, which every termination route reaches — typing `cancel` in any capitalisation, the 120-second inactivity timeout, the sender disconnecting, and another plugin calling `Conversation#abandon()`. A send the service refuses hands it back the same way. The return runs at most once per conversation (Bukkit's own `abandoned` guard), and what the sender's inventory can no longer hold is dropped at their feet rather than destroyed. What routes an item to that return is the conversation's custody of it, which only a mail actually accepting the items clears — not a cancellation verdict | command | `/sendmail <player> <subject> attach` (alias `/sm`) | ultimail.send | player | player | detailed | SendMailCommand#sendMailWithItems |
+| ultimail.sendmail.attach | Send mail with an attachment: a sender holding `ultimail.admin.multiattach` gets the multi-item `AttachmentSelectorPage`; an ordinary sender attaches only their main-hand item (removed from their hand immediately, before the content prompt even begins). The attachment is handed back whenever the content prompt ends without the mail being sent, and the return does not depend on WHY it ended: it runs from Bukkit's conversation-abandonment hook, which every termination route reaches — typing `cancel` in any capitalisation, the 120-second inactivity timeout, the sender disconnecting, and another plugin calling `Conversation#abandon()`. A send the service refuses hands it back the same way. The return runs at most once per conversation (Bukkit's own `abandoned` guard), and what the sender's inventory can no longer hold is dropped at their feet rather than destroyed. What routes an item to that return is the conversation's custody of it, which only a mail actually accepting the items clears — not a cancellation verdict | command | `/sendmail <player> <subject> attach` (alias `/sm`; several subject words allowed; the final word `attach` selects this path) | ultimail.send | player | player | detailed | SendMailCommand#sendMailFreeText → #sendMailWithItems |
 | ultimail.sendmail.help | Print `/sendmail` usage (two lines plus a cancel hint), fully via `plugin.i18n(...)` | command | bare `/sendmail` | ultimail.send | player | player | none | SendMailCommand#handleHelp |
-| ultimail.sendmail.text | Send a text-only mail; content is collected via a modal chat conversation (120s timeout, `cancel` to abort) started after the command itself | command | `/sendmail <player> <subject>` (alias `/sm`) | ultimail.send | player | player | brief | SendMailCommand#sendMail |
+| ultimail.sendmail.text | Send a text-only mail; content is collected via a modal chat conversation (120s timeout, `cancel` to abort) started after the command itself | command | `/sendmail <player> <subject>` (alias `/sm`; several subject words allowed) | ultimail.send | player | player | brief | SendMailCommand#sendMailFreeText → #sendMail |
 
 ## Notifications and Integration
 

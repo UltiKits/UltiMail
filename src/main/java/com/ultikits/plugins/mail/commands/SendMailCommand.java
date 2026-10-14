@@ -74,16 +74,36 @@ public class SendMailCommand extends BaseCommandExecutor {
         this.plugin = plugin;
     }
     
-    @CmdMapping(format = "<player> <subject>")
-    public void sendMail(@CmdSender Player sender, @CmdParam("player") String receiver, @CmdParam("subject") String subject) {
+    /**
+     * {@code /sendmail <player> <subject> [attach]}: the subject may hold several words. A final word
+     * {@code attach} takes the attachment path and the words before it are the subject (see
+     * {@link TrailingFlag}); an empty subject starts nothing and shows the help.
+     */
+    @CmdMapping(format = "<player> <subject...>")
+    public void sendMailFreeText(@CmdSender Player sender, @CmdParam("player") String receiver,
+                                 @CmdParam("subject") String[] words) {
+        TrailingFlag parsed = TrailingFlag.split(words, "attach");
+        if (parsed.getText().isEmpty()) {
+            handleHelp(sender);
+            return;
+        }
+        if (parsed.isFlagged()) {
+            sendMailWithItems(sender, receiver, parsed.getText());
+        } else {
+            sendMail(sender, receiver, parsed.getText());
+        }
+    }
+
+    /** A text mail; reached through {@link #sendMailFreeText}. */
+    public void sendMail(Player sender, String receiver, String subject) {
         // Exactly the same conversation as the attachment path, carrying no attachment. Building
         // it here a second time was how the two paths came to differ (UltiKits/UltiMail#27:
         // only one of the two ever returned items).
         startContentConversation(sender, receiver, subject, null);
     }
 
-    @CmdMapping(format = "<player> <subject> attach")
-    public void sendMailWithItems(@CmdSender Player sender, @CmdParam("player") String receiver, @CmdParam("subject") String subject) {
+    /** A mail with attachments; reached through {@link #sendMailFreeText}. */
+    public void sendMailWithItems(Player sender, String receiver, String subject) {
         // Check if admin has multi-attach permission
         if (sender.hasPermission(ADMIN_PERMISSION)) {
             // Open multi-attachment GUI for admins

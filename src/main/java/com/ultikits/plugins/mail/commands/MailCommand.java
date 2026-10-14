@@ -270,18 +270,35 @@ public class MailCommand extends BaseCommandExecutor {
     // ==================== Admin Commands ====================
     
     /**
-     * Send mail to all players (text only).
+     * {@code /mail sendall <content> [items]}: broadcast mail whose content may hold several words. A final word
+     * {@code items} opens the attachment selector and the words before it are the content (see
+     * {@link TrailingFlag}); an empty content sends nothing and shows the usage line.
      */
-    @CmdMapping(format = "sendall <content>", permission = "ultimail.admin.sendall")
-    public void sendAll(@CmdSender Player player, @CmdParam("content") String content) {
+    @CmdMapping(format = "sendall <content...>", permission = "ultimail.admin.sendall")
+    public void sendAllFreeText(@CmdSender Player player, @CmdParam("content") String[] words) {
+        TrailingFlag parsed = TrailingFlag.split(words, "items");
+        if (parsed.getText().isEmpty()) {
+            player.sendMessage(helpLine(ChatColor.RED, i18n("help_sendall")));
+            return;
+        }
+        if (parsed.isFlagged()) {
+            sendAllWithItems(player, parsed.getText());
+        } else {
+            sendAll(player, parsed.getText());
+        }
+    }
+
+    /**
+     * Send mail to all players (text only). Reached through {@link #sendAllFreeText}.
+     */
+    public void sendAll(Player player, String content) {
         mailService.sendToAll(player, content, null);
     }
     
     /**
-     * Send mail to all players with attachments from GUI.
+     * Send mail to all players with attachments from GUI. Reached through {@link #sendAllFreeText}.
      */
-    @CmdMapping(format = "sendall <content> items", permission = "ultimail.admin.sendall")
-    public void sendAllWithItems(@CmdSender Player player, @CmdParam("content") String content) {
+    public void sendAllWithItems(Player player, String content) {
         int maxItems = mailService.getConfig().getMaxItems();
         
         new AttachmentSelectorPage(player, maxItems, plugin,
