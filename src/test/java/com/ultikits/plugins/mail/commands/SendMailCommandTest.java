@@ -461,13 +461,13 @@ class SendMailCommandTest {
         }
 
         @Test
-        @DisplayName("sendMail 应该有 @CmdMapping 注解")
+        @DisplayName("the free-text entry point carries the varargs @CmdMapping (sendMail itself no longer does)")
         void shouldHaveCmdMappingAnnotation() throws Exception {
             Method method = SendMailCommand.class.getDeclaredMethod(
-                "sendMail", org.bukkit.entity.Player.class, String.class, String.class);
+                "sendMailFreeText", org.bukkit.entity.Player.class, String.class, String[].class);
             CmdMapping mapping = method.getAnnotation(CmdMapping.class);
             assertThat(mapping).isNotNull();
-            assertThat(mapping.format()).isEqualTo("<player> <subject>");
+            assertThat(mapping.format()).isEqualTo("<player> <subject...>");
         }
     }
 
@@ -478,13 +478,11 @@ class SendMailCommandTest {
     class SendMailWithItemsMethodTests {
 
         @Test
-        @DisplayName("sendMailWithItems 应该有 @CmdMapping 注解")
+        @DisplayName("sendMailWithItems is reached through the free-text mapping, not a mapping of its own")
         void shouldHaveCmdMappingAnnotation() throws Exception {
             Method method = SendMailCommand.class.getDeclaredMethod(
                 "sendMailWithItems", org.bukkit.entity.Player.class, String.class, String.class);
-            CmdMapping mapping = method.getAnnotation(CmdMapping.class);
-            assertThat(mapping).isNotNull();
-            assertThat(mapping.format()).isEqualTo("<player> <subject> attach");
+            assertThat(method.getAnnotation(CmdMapping.class)).isNull();
         }
 
         @Test
