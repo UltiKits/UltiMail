@@ -60,14 +60,19 @@ public class RecallCommand extends BaseCommandExecutor {
     
     /**
      * Send recall notifications with custom message.
-     * 
+     * <p>
+     * The message is the rest of the command line: {@code <message...>} is the framework's varargs form, so
+     * {@code /recall Come back, we miss you} sends the whole sentence, its words joined by single spaces. A plain
+     * {@code <message>} took one word only and refused a sentence (UltiTools 6.3.0 Phase 19, D19-135).
+     *
      * @param sender Command sender
-     * @param message Custom message
+     * @param messageWords the custom message's words; {@code null} or empty sends the configured recall text
      */
-    @CmdMapping(format = "<message>", permission = "ultimail.recall")
+    @CmdMapping(format = "<message...>", permission = "ultimail.recall")
     public void sendRecallWithMessage(
             @CmdSender CommandSender sender,
-            @CmdParam("message") String message) {
+            @CmdParam("message") String[] messageWords) {
+        String message = messageWords == null || messageWords.length == 0 ? null : String.join(" ", messageWords);
         
         if (!sender.isOp() && !sender.hasPermission("ultimail.recall.admin")) {
             sender.sendMessage(ChatColor.RED + plugin.i18n("recall_no_permission"));

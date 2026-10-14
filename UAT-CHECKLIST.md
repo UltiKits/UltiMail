@@ -49,6 +49,12 @@ for real-machine verification, not user-facing documentation.
   `ultimail.lifecycle.config-text-language` on a fresh file, across a `language` switch and on a file an
   earlier version wrote; they are named by the config-text convention
   (`<prefix>.config.<file stem>.materialize-*`) rather than by that FEATURES ID.
+- **Console lines carry the module-logger prefix.** Every line this module logs reaches the console as
+  `[UltiTools] [UltiMail] <text>`: Paper adds `[UltiTools] `, and the framework's module logger (`PluginLogger`)
+  adds `[UltiMail] ` (this module's `plugin.yml` `name`). A console line quoted below is the `<text>` after both
+  prefixes, character for character, unless the row quotes a prefix itself; a row that counts or excludes this
+  module's console lines means lines carrying `[UltiMail]`. A line the framework logs is quoted after Paper's
+  prefix, with its own `[UltiTools-API] ` where the row shows it.
 
 ## Send Mail
 
