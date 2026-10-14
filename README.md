@@ -53,7 +53,7 @@ UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模�
 
 1. 确保服务器已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.3.0+（本模块声明 `api-version: 630`，更早的框架会拒绝加载它）
 2. 将 `UltiMail-1.1.0.jar` 放入 `plugins/UltiTools/plugins/` 目录
-3. 重启服务器或使用 `/ul reload` 重载插件
+3. 重启服务器（`/ul reload` 只重载配置，不会加载新的模块 JAR）
 
 **或通过 UPM 安装:**
 ```
