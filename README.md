@@ -1,8 +1,6 @@
 # UltiMail
 
 [![UltiTools-API](https://img.shields.io/badge/UltiTools--API-6.3.0%2B-blue)](https://github.com/UltiKits/UltiTools-Reborn)
-[![Paper](https://img.shields.io/badge/Paper-1.21%2B-green)](https://papermc.io/)
-[![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
 
 UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模块，支持玩家之间发送邮件、附带物品，以及管理员群发功能。
 
@@ -53,9 +51,9 @@ UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模�
 
 ## 📦 安装
 
-1. 确保服务器已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.3.0+（本模块声明 `api-version: 630`，更早的框架会拒绝加载它；仅支持 Paper 1.21+、Java 21+）
+1. 确保服务器已安装 [UltiTools-API](https://github.com/UltiKits/UltiTools-Reborn) 6.3.0+（本模块声明 `api-version: 630`，更早的框架会拒绝加载它）
 2. 将 `UltiMail-1.1.0.jar` 放入 `plugins/UltiTools/plugins/` 目录
-3. 重启服务器或使用 `/ul reload` 重载插件
+3. 重启服务器（`/ul reload` 只重载配置，不会加载新的模块 JAR）
 
 **或通过 UPM 安装:**
 ```
@@ -116,10 +114,6 @@ subject that should itself end with that word cannot be sent as written; reword 
 群发内容为“Server restart”的带附件邮件，`/sendmail Alex Meeting attach` 发送标题为“Meeting”的带附件邮件。若内容或标题
 本身就要以这个词结尾，无法按原样发送，请换一种写法（例如 `... items list`）。只写这个词、或什么文字都不写时，不会发送，
 并显示该命令的用法。
-
-UltiMail requires Minecraft 1.21 or later (Paper 1.21+), even though the UltiTools-API 6.3.0 framework itself runs on Paper 1.19.2 build 163 or later. On Paper 1.19.2–1.20.6, the module can load, but the mail attachment GUI fails with `IncompatibleClassChangeError`: `InventoryView` became an interface in Minecraft 1.21, and framework-loaded modules do not receive Paper's bytecode rewriting. Run this module on Paper 1.21 or later. Backward compatibility is tracked in [UltiKits/UltiTools-Reborn#655](https://github.com/UltiKits/UltiTools-Reborn/issues/655).
-
-UltiMail 需要 Minecraft 1.21 或更高版本（Paper 1.21+），即使 UltiTools-API 6.3.0 框架本身可运行于 Paper 1.19.2 build 163 或更高版本。在 Paper 1.19.2–1.20.6 上，模块可能成功加载，但邮件附件界面会出现 `IncompatibleClassChangeError`：`InventoryView` 在 Minecraft 1.21 中由类变为接口，而由框架加载的模块不会经过 Paper 的字节码改写。请在 Paper 1.21 或更高版本上运行本模块。向下兼容工作由 [UltiKits/UltiTools-Reborn#655](https://github.com/UltiKits/UltiTools-Reborn/issues/655) 跟踪。
 
 ## 🖼️ GUI 预览
 
