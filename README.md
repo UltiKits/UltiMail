@@ -66,13 +66,14 @@ UltiMail 是基于 UltiTools-API 框架开发的游戏内邮件系统插件模�
 
 ```yaml
 # 是否在玩家登录时通知未读邮件
-notify_on_join: true
+notify-on-join: true
 
-# 登录通知延迟（秒）
-notify_delay: 3
+# 登录通知延迟（秒，0-60）
+notify-delay: 3
 
 # 新邮件通知消息模板
-new_mail_message: "&e[邮件] &f你有 &a{COUNT} &f封未读邮件！"
+messages:
+  mail-received: "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"
 ```
 
 ## ⚠️ Known limitations / 已知限制
