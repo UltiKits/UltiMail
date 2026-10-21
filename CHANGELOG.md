@@ -5,20 +5,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
-## [Unreleased]
+## [2.0.0] - 2026-10-21
 
 ### Changed
 
-- This version requires UltiTools 6.3.0 or later and declares `api-version: 630` in `plugin.yml` (it was
-  `621`). Frameworks 6.2.1 to 6.2.5 accepted the old declaration although this module calls
-  `DataOperator.updateCounted`, which those versions do not have; they now refuse the module at load with a
-  warning that the UltiTools version is outdated, naming `UltiMail`. The README's framework minimum
-  and its server and Java badges now say UltiTools 6.3.0+, Paper 1.21+ and Java 21+
-  (UltiKits/UltiMail#7, UltiKits/UltiTools-Reborn#544).
-- 本版本需要 UltiTools 6.3.0 或更高版本，并在 `plugin.yml` 中声明 `api-version: 630`（原为 `621`）。本模块此前就已需要
-  6.3.0：6.2.1 至 6.2.5 的框架此前会接受旧声明，但本模块调用的 `DataOperator.updateCounted` 在这些版本中不存在；
-  现在它们会在加载时拒绝本模块，并给出点名 `UltiMail` 的"UltiTools 版本过旧"警告。
-  README 中的框架最低版本以及服务端与 Java 徽章已改为 UltiTools 6.3.0+、Paper 1.21+、Java 21+
+- This version requires UltiTools 6.3.0 or later and raises `api-version` in `plugin.yml` from `620`
+  (the released 1.1.0 declaration) to `630`. Upgrade UltiTools before replacing the module JAR;
+  older frameworks refuse this module at load with a warning that the UltiTools version is outdated,
+  naming `UltiMail`. This module uses `DataOperator.updateCounted`, which frameworks 6.2.1 to 6.2.5
+  do not provide (UltiKits/UltiMail#7, UltiKits/UltiTools-Reborn#544).
+- 本版本需要 UltiTools 6.3.0 或更高版本，并将 `plugin.yml` 中的 `api-version` 从 `620`（已发布的 1.1.0 的声明）
+  提高到 `630`。更换模块 JAR 前请先升级 UltiTools；旧框架会在加载时拒绝本模块，并给出点名 `UltiMail` 的
+  “UltiTools 版本过旧”警告。本模块使用的 `DataOperator.updateCounted` 在 6.2.1 至 6.2.5 的框架中不存在
   （UltiKits/UltiMail#7、UltiKits/UltiTools-Reborn#544）。
 - `plugin.yml` now declares `identify-string: ultimail`, the key of this module's entry in the UltiCloud
   catalogue. The framework's update check and `/upm update` skip a module that does not declare it, so this
@@ -27,14 +25,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `plugin.yml` 现在声明 `identify-string: ultimail`，即本模块在 UltiCloud 模块目录中的条目键。框架的更新检查和
   `/upm update` 会跳过未声明该键的模块，因此本模块现在会参与两者：带有同一键的更高发布版本会在启动时提示，
   并可用 `/upm update` 安装（UltiKits/UltiTools-Reborn#474）。
-- The next published version raises `api-version` from `620` (as 1.1.0 was released) to `630`. Under the
-  module version rules (UltiKits/UltiTools-Dev-Doc#7 and #12) that is a major change, because the server owner
-  must upgrade UltiTools before swapping the JAR; its number is chosen when it is released. Why 1.1.0 carries
-  its number is recorded under 1.1.0 below (UltiKits/UltiMail#7).
-- 下一个发布版本会把 `api-version` 从 `620`（1.1.0 发布时的声明）提高到 `630`。按模块版本号规范
-  （UltiKits/UltiTools-Dev-Doc#7 与 #12），服主须先升级 UltiTools 才能换 JAR，因此属于主版本变更；其版本号在发布时确定。
-  1.1.0 这个版本号的由来记在下方 1.1.0 一节（UltiKits/UltiMail#7）。
-
 - Message and title settings in `config/mail.yml` — the new-mail notice (`messages.mail-received`), the
   server name recall mails carry (`recall.server-name`), and the recall mail and email texts
   (`recall.subject`, `recall.content`, `email.recall-subject`, `email.recall-content`) — are written in the
@@ -195,7 +185,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (UltiKits/UltiMail#20).
 - Unloading this module (`/upm uninstall UltiMail`) now runs the framework's command
   unregistration and then its listener unregistration, so the module's commands are really removed
-  and its listeners stop firing; this module has no unload work of its own. Previously this module's
+  and its listeners stop firing. Its unload hook returns items from open attachment selectors before
+  the listeners are removed. Previously this module's
   unload method replaced the framework's and only logged a line, so after `/upm uninstall UltiMail`
   both its commands and its listeners stayed active until the server restarted (UltiKits/UltiMail#20).
 - An item placed in the attachment selector is now given back when that GUI is closed without
@@ -230,7 +221,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   重载方法替换了框架的重载方法且只输出一行日志，这两步都不会执行。UltiTools 6.3.0 还会在此时报告
   `@ConditionalOnConfig` 漂移并输出框架自身的模块重载日志（UltiKits/UltiMail#20）。
 - 卸载本模块（`/upm uninstall UltiMail`）现在会先由框架注销命令，再注销监听器，本模块的命令会被真正移除，
-  其监听器也不再触发；本模块自身没有卸载工作。此前本模块的卸载方法替换了框架的卸载方法且只输出一行日志，
+  其监听器也不再触发。模块的卸载钩子会在监听器被移除之前归还打开着的附件选择界面中的物品。此前本模块的卸载方法替换了框架的卸载方法且只输出一行日志，
   因此执行 `/upm uninstall UltiMail` 后，其命令和监听器都会保持生效，直到服务器重启（UltiKits/UltiMail#20）。
 - 放入附件选择界面的物品在未点击"确认"就关闭该界面时会被归还——该界面可由持有
   `ultimail.admin.multiattach` 的发送者执行 `/sendmail <玩家> <主题> attach`，或执行
@@ -294,8 +285,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the edited file kept as `.bak` (UltiKits/UltiTools-Reborn#616). Their placeholders differ from the removed keys': `notify_new_mail`
   carries `{0}` where the old key used `{COUNT}`, and `mail_sent_success` takes the receiver's
   name as `{RECEIVER}` (not `{PLAYER}`); text pasted across with the old placeholder is refused by
-  the framework, which then uses the bundled text. The join notification does not yet put the
-  unread count into `{0}` (UltiKits/UltiMail#24). What players see is unchanged. `messages.mail-received`, the setting
+  the framework, which then uses the bundled text. The join notification now fills `{0}` with the
+  unread count (UltiKits/UltiMail#24). Removing these unused settings does not change what players see.
+  `messages.mail-received`, the setting
   for the message an online receiver gets when a mail arrives, is read and stays. A server upgraded
   from an earlier version keeps both removed keys in its `mail.yml`; while either is there, the
   module logs one warning for it at startup and on every reload of this module, naming the file,
@@ -317,8 +309,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   （例如 `lang/zh-myserver.yml`），在副本中修改这些条目，并在 `plugins/UltiTools/config.yml` 中设置 `language: zh-myserver`；
   直接修改官方文件的改动会在下次启动或模块重载时被恢复，修改过的文件保留为 `.bak`（UltiKits/UltiTools-Reborn#616）。这两个条目的占位符与被移除的
   键不同：`notify_new_mail` 使用 `{0}`（旧键为 `{COUNT}`），`mail_sent_success` 以 `{RECEIVER}`
-  （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒目前尚未把未读数量
-  填入 `{0}`（UltiKits/UltiMail#24）。玩家看到的内容不变。
+  （而非 `{PLAYER}`）表示收件人名称；照搬旧占位符的文本会被框架拒绝，并改用内置文本。登录提醒现在会把未读数量
+  填入 `{0}`（UltiKits/UltiMail#24）。移除这些未使用的设置不会改变玩家看到的内容。
   同一段中的 `messages.mail-received`（在线收件人收到新邮件时看到的消息）会被读取，予以保留。从旧版本升级的
   服务器，其 `mail.yml` 中仍会保留这两个被移除的键；只要其中任一个还在，本模块会在启动时以及每次重载本模块时
   为它记录一条警告，指出文件、键名以及现在保存该文本的语言条目，直接删除该键即可（UltiKits/UltiMail#23）。
