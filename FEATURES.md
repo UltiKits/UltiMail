@@ -186,6 +186,11 @@ All three classes below are excluded from this module's JaCoCo `check` gate.
 
 ## Lifecycle Hooks
 
+| ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
+|---|---|---|---|---|---|---|---|---|
+| ultimail.lifecycle.compatibility-refuse | At the start of `registerSelf()`, Minecraft below 1.21 with UltiTools below 6.4.0 returns false before activation: no module commands, listeners, tasks or GUI entry points are registered. Logs `UltiMail needs UltiTools 6.4.0 or later on Minecraft versions below 1.21 (server: {SERVER}, UltiTools: {FRAMEWORK}). Please update UltiTools.` in English (versions substituted), with a Chinese translation. The framework may scan/construct beans and load configuration before this hook; none of those paths executes the affected GUI call. | event | start on 1.20.6 with UltiTools 6.3.x | n/a | n/a | admin | detailed | UltiMail#registerSelf, StartupCompatibility#evaluate |
+| ultimail.lifecycle.compatibility-allow | Minecraft 1.21+ keeps accepting UltiTools 6.3.x; older Minecraft accepts UltiTools 6.4.0+, including `6.4.0-SNAPSHOT`. Unknown versions warn `UltiMail could not determine startup compatibility (server: {SERVER}, UltiTools: {FRAMEWORK}). Continuing without the version check.` and continue; a snapshot counts as its numeric version. Successful enable still logs `UltiMail has been enabled!` in English. | event | start on 1.21.11 with UltiTools 6.3.x | n/a | n/a | admin | detailed | UltiMail#registerSelf, StartupCompatibility#evaluate |
+
 As of UltiTools 6.3.0 `UltiToolsPlugin#unregisterSelf()` and `UltiToolsPlugin#reloadSelf()` are
 `final` framework template methods. Before `UltiKits/UltiMail#20` this module overrode both
 directly, completely replacing the framework's own steps, and each override only logged a line;

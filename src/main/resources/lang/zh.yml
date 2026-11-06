@@ -2,6 +2,8 @@
 
 # === 系统消息 ===
 mail_enabled: "UltiMail 已启用！"
+startup_incompatible: "UltiMail 在低于 Minecraft 1.21 的版本上需要 UltiTools 6.4.0 或更高版本 (server: {SERVER}, UltiTools: {FRAMEWORK})。请更新 UltiTools。"
+startup_version_unknown: "UltiMail 无法确定启动兼容性 (server: {SERVER}, UltiTools: {FRAMEWORK})。将跳过版本检查并继续启动。"
 
 # === 收件箱 ===
 inbox_empty: "收件箱为空！"

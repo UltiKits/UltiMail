@@ -8,6 +8,9 @@ import com.ultikits.ultitools.abstracts.UltiToolsPlugin;
 import com.ultikits.ultitools.annotations.UltiToolsModule;
 import com.ultikits.ultitools.context.SimpleContainer;
 
+import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -29,12 +32,36 @@ public class UltiMail extends UltiToolsPlugin {
 
     @Override
     public boolean registerSelf() {
+        String minecraft = runningMinecraftVersion();
+        String framework = runningFrameworkVersion();
+        StartupCompatibility.Decision decision = StartupCompatibility.evaluate(minecraft, framework);
+        if (decision == StartupCompatibility.Decision.REFUSE) {
+            getLogger().error(i18n("startup_incompatible")
+                    .replace("{SERVER}", String.valueOf(minecraft))
+                    .replace("{FRAMEWORK}", String.valueOf(framework)));
+            return false;
+        }
+        if (decision == StartupCompatibility.Decision.UNKNOWN) {
+            getLogger().warn(i18n("startup_version_unknown")
+                    .replace("{SERVER}", String.valueOf(minecraft))
+                    .replace("{FRAMEWORK}", String.valueOf(framework)));
+        }
         getLogger().info(i18n("mail_enabled"));
         // Deleting a key from MailConfig does nothing to the operator's existing file, so tell them
         // about any key this version no longer reads (UltiKits/UltiMail#23).
         warnAboutRemovedConfigKeys();
         writeConfigTextInServerLanguage();
         return true;
+    }
+
+    // Package-private seams let lifecycle tests supply versions without booting the core plugin.
+    String runningMinecraftVersion() {
+        return Bukkit.getBukkitVersion();
+    }
+
+    String runningFrameworkVersion() {
+        Plugin core = Bukkit.getPluginManager().getPlugin("UltiTools");
+        return core == null ? null : core.getDescription().getVersion();
     }
 
     /**

@@ -730,6 +730,10 @@ class MailConfigTextTest {
     private Object moduleAnswer(org.mockito.invocation.InvocationOnMock invocation) throws Throwable {
         String name = invocation.getMethod().getName();
         switch (name) {
+            case "runningMinecraftVersion":
+                return "1.21.11";
+            case "runningFrameworkVersion":
+                return "6.3.0";
             case "registerSelf":
             case "onReload":
                 return invocation.callRealMethod();
