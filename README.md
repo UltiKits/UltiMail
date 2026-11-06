@@ -332,7 +332,7 @@ UltiMail 支持多语言，语言文件位于 `lang/` 目录：
 
 ## 📄 开源协议
 
-本项目基于 [MIT License](LICENSE) 开源。
+本项目基于 [MIT License](https://opensource.org/license/mit) 开源。
 
 ## 🤝 贡献
 
