@@ -66,11 +66,9 @@ class MailConfigTest {
         }
 
         @Test
-        @DisplayName("declares exactly 20 keys, three fewer than before UltiKits/UltiMail#23")
-        void declaresTwentyKeys() {
-            // FEATURES.md's ## Configuration and UAT-CHECKLIST.md's ultimail.config.mail-yml row both
-            // count this number; 23 before the removal.
-            assertThat(declaredPaths()).hasSize(20);
+        @DisplayName("declares 21 keys, including the new opt-in expiry key, not the removed one")
+        void declaresTwentyOneKeys() {
+            assertThat(declaredPaths()).hasSize(21).contains("expiry.retention-days");
         }
     }
 

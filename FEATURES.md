@@ -19,10 +19,9 @@ for UAT execution and issue reconciliation — the public description of these f
   when the feature's identity changes, never on rewording. IDs are unique within a repository.
 - **Kind**, exactly these eight values: `command`, `config`, `event`, `gui`, `scheduled`,
   `placeholder`, `persistence`, `gate`. Each maps one-to-one onto a reconciliation-table line.
-  This module has no `scheduled` rows (`@Scheduled` count is 0, confirmed below), no `gate` rows
+  This module has one `scheduled` row (`@Scheduled` count is 1, confirmed below), no `gate` rows
   (`@ConditionalOnConfig` count is 0), and no `placeholder` rows (this module registers no
-  PlaceholderAPI expansion and consumes none) — all three Kinds stay in the vocabulary for
-  cross-repository consistency even though none appears below. The three rows under `## Lifecycle Hooks` are
+  PlaceholderAPI expansion and consumes none). The three rows under `## Lifecycle Hooks` are
   `event` rows with no `@EventHandler` site behind them: module load, `/ul reload` and
   `/upm uninstall` are framework-invoked lifecycle steps, not commands this repository maps or
   config reads, so `event` is the closest-fitting Kind.
@@ -43,7 +42,7 @@ for UAT execution and issue reconciliation — the public description of these f
   `requireOp = true`, so no row below carries the suffix. `n/a` is for every Kind that is not
   `command`.
 - **Source:** `ClassName#member` — the class and member that actually reads or applies the
-  feature — for every Kind, `config` included: all 20 `config` rows below cite the reading
+  feature — for every Kind, `config` included: all 21 `config` rows below cite the reading
   member. This module's one configuration file (`mail.yml`) is a real
   `@ConfigEntity`/`@ConfigEntry`-bound class, so a config row's Source cites whichever class and
   method actually calls the generated getter — not the config class's own field declaration,
@@ -87,9 +86,9 @@ rather than an error:
    same command is trustworthy unmodified against every repository in the fan-out.
 
 **Positive control:** the line-start form returns `@CmdExecutor` = 3, `@CmdMapping` = 15,
-`@EventListener` = 2 (classes), `@EventHandler` = 5 (handler methods), `@Scheduled` = 0,
-`@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 20, `@Table` = 1
-(`MailData`) — confirmed by reading all 15 source files directly, not by trusting the count
+`@EventListener` = 2 (classes), `@EventHandler` = 5 (handler methods), `@Scheduled` = 1,
+`@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 21, `@Table` = 1
+(`MailData`) — confirmed against the 16 production source files, not by trusting the count
 alone. `MailCommand`'s eleven `@CmdMapping` sites are this module's standing positive control —
 the class with the most sub-commands behind one executor, the shape most likely to silently drop
 a row under a naive approach, confirmed present one by one against `MailCommand.java`'s own
@@ -101,10 +100,9 @@ section below; and two free-text mappings that each serve two rows, because a fi
 attachment path (UltiTools-API 6.3.0 Phase 19, maintainer ruling of 2026-10-14; `TrailingFlag`):
 `sendall <content...>` serves `ultimail.mail.broadcast` and `ultimail.mail.broadcast-with-items` (final word
 `items`), and `SendMailCommand`'s `<player> <subject...>` serves `ultimail.sendmail.text` and
-`ultimail.sendmail.attach` (final word `attach`). This section carries 0 rows against the
-reconciliation table's `@Scheduled` = 0 (this module runs no scheduled task at all, and has no
-mail expiry: the `mail-expire-days` key that implied one was removed by `UltiKits/UltiMail#23`,
-and mail expiry is a feature request, `UltiKits/UltiMail#34`).
+`ultimail.sendmail.attach` (final word `attach`). The Scheduled section carries one row against
+`@Scheduled` = 1: opt-in expiry added for `UltiKits/UltiMail#34`, using a new disabled-by-default
+key instead of the removed `mail-expire-days` (`UltiKits/UltiMail#23`).
 
 ## Mail
 
@@ -207,8 +205,14 @@ re-initialises, in place, the same `MailConfig` instance the container injected 
 |---|---|---|---|---|---|---|---|---|
 | ultimail.lifecycle.config-text-language | On module enable and again on every reload of it (`UltiMail#registerSelf`, `#onReload`, both after the framework has read `config/mail.yml` and loaded the language — never from a configuration change listener, which the framework fires before it reloads the language): each of the six text settings (`messages.mail-received`, `recall.server-name`, `recall.subject`, `recall.content`, `email.recall-subject`, `email.recall-content`) that is still built-in text — the Chinese default an earlier version shipped, or this jar's English or Chinese text for it (read from the module jar, never from the language files on disk) — and differs from the current text is replaced with the text in the server's language, and the file is saved once. An untouched value therefore follows a `language` switch in both directions; a value that differs in any way, even by one character — such as a `recall.server-name` set to the server's own name — is the operator's and is kept byte for byte; a text that would break the setting's `@NotEmpty` is never written; a second start with the same language writes nothing. A single-module `/ul reload UltiMail` does not re-read the framework's `language`, so a changed `language` is picked up on a bare `/ul reload` or a restart. A failed save is logged as one warning from the language file (`log_config_default_save_failed`), and the module keeps using the new text for that session. The text written is this jar's own built-in text for the server's language (the jar's `lang/<language>.yml`), not the extracted language file on disk, so every value the module writes is one it recognises again; these settings are edited in the config file, and an edit of the extracted language file does not change them (earlier versions never read them from the language file either; the text source decision of 2026-09-25) | event | automatic, at module enable and at `/ul reload` | n/a | n/a | admin | brief | UltiMail#registerSelf, UltiMail#onReload, MailConfig#materializeText, ConfigTextDefaults |
 | ultimail.lifecycle.reload | `/ul reload UltiMail` re-reads `config/mail.yml` into the running module, so an edited value such as `max-subject-length` applies to the next mail submitted without a restart; this module's own reload work is the removed-key warning (`ultimail.lifecycle.removed-key-warning`) and writing its text settings in the server's language (`ultimail.lifecycle.config-text-language`), and it prints no reload line of its own. Before `UltiKits/UltiMail#20` the module's reload override replaced the framework's reload and only logged, so an edit took effect only after a restart | event | `/ul reload UltiMail` (framework calls `reloadSelf()`, which reloads configuration, refreshes language, reports `@ConditionalOnConfig` drift and logs its own per-module line) | n/a | n/a | admin | brief | MailService#sendMail |
-| ultimail.lifecycle.removed-key-warning | When this module loads, and on every reload of it, it checks its operator's own `config/mail.yml` for the three keys `UltiKits/UltiMail#23` removed (`mail-expire-days`, `messages.new-mail`, `messages.mail-sent`), which the framework never deletes from an existing file, and logs one WARNING per key still present, naming the file and the key and saying where the setting went: mail expiry is a feature request (`UltiKits/UltiMail#34`), and each message's text comes from this module's language file (`notify_new_mail`, `mail_sent_success`; customised in a copied file whose name starts with the language code and a hyphen, selected with `language`, never in the official file, which is restored at every start and module reload), whose placeholders are `{0}` and `{RECEIVER}` where the removed keys used `{COUNT}` and `{PLAYER}` (the join notification does not yet put the count into `{0}`, `UltiKits/UltiMail#24`). A file without those keys produces no line; a missing or unparseable file produces none either; a failure inside the check is logged and never fails the load or the reload | event | server start (the framework calls `registerSelf()` when it loads this module), and `/ul reload UltiMail` or `/ul reload` (framework calls `reloadSelf()`, which calls this module's `onReload()` last) | n/a | n/a | admin | brief | UltiMail#registerSelf, UltiMail#onReload, RemovedConfigKeys#warnAboutLeftovers |
+| ultimail.lifecycle.removed-key-warning | When this module loads, and on every reload of it, it checks its operator's own `config/mail.yml` for the three keys `UltiKits/UltiMail#23` removed (`mail-expire-days`, `messages.new-mail`, `messages.mail-sent`), which the framework never deletes from an existing file, and logs one WARNING per key still present, naming the file and the key and saying where the setting went: the old expiry key is still ignored and names the new opt-in `expiry.retention-days: 0` (`UltiKits/UltiMail#34`), and each message's text comes from this module's language file (`notify_new_mail`, `mail_sent_success`; customised in a copied file whose name starts with the language code and a hyphen, selected with `language`, never in the official file, which is restored at every start and module reload), whose placeholders are `{0}` and `{RECEIVER}` where the removed keys used `{COUNT}` and `{PLAYER}` (the join notification does not yet put the count into `{0}`, `UltiKits/UltiMail#24`). A file without those keys produces no line; a missing or unparseable file produces none either; a failure inside the check is logged and never fails the load or the reload | event | server start (the framework calls `registerSelf()` when it loads this module), and `/ul reload UltiMail` or `/ul reload` (framework calls `reloadSelf()`, which calls this module's `onReload()` last) | n/a | n/a | admin | brief | UltiMail#registerSelf, UltiMail#onReload, RemovedConfigKeys#warnAboutLeftovers |
 | ultimail.lifecycle.unload | Unloading this module hands back every item still sitting in an open `AttachmentSelectorPage` and closes that page, before the module stops listening. This is the module's only unload work: the framework's own command and listener unregistration runs around it, and `unregisterSelf()` is not overridden (it is `final`). It exists because the other two returns both need an event that unloading removes the listener for — the items an open selector holds live only in an in-memory inventory container that nothing persists, so without this they were destroyed (`UltiKits/UltiMail#27`) | event | `/upm uninstall UltiMail` (framework calls `unregisterSelf()`, which calls this module's `onUnregister()` first) | n/a | n/a | admin | detailed | UltiMail#onUnregister, AttachmentGUIListener#returnEveryOpenSelector |
+
+## Scheduled
+
+| ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
+|---|---|---|---|---|---|---|---|---|
+| ultimail.expiry.purge | Opt-in asynchronous full-table expiry scan, first after 1200 ticks and every 1200 ticks thereafter. A row is permanently removed from both boxes only when read, its positive sent_time is at least expiry.retention-days full 24-hour days old, and it has no unclaimed items or unexecuted commands (the existing recorded-attempt marker counts as executed). Unread mail, future/invalid timestamps and pending value are retained; no attachment is returned or executed. Disabled by default; reads the current retention each pass, so reload takes effect next pass. A failed scan is logged and retried next pass; each failed deletion is logged with its mail id and the pass continues. Until physically removed, mail remains visible; an already-open GUI may still display its old text. JSON durability follows the framework's cache-flush contract | scheduled | set expiry.retention-days to 1-365 in config/mail.yml and reload; wait for the scheduled pass | n/a | n/a | admin | detailed | MailExpiryService#purgeExpiredMail |
 
 ## Data persistence
 
@@ -218,18 +222,18 @@ re-initialises, in place, the same `MailConfig` instance the container injected 
 
 ## Configuration
 
-Every `@ConfigEntry`-annotated field on this module's one `@ConfigEntity` class (20 keys total,
+Every `@ConfigEntry`-annotated field on this module's one `@ConfigEntity` class (21 keys total,
 matching the reconciliation table's own `@ConfigEntry` count exactly). Several of these keys
 already have a behavioural row above (broadcast, recall, notification) — that row documents the
 *feature* the key drives, this row documents the *key* itself, at key granularity, so the
 reconciliation table can prove every key is accounted for without also making every behavioural
 row carry a `config` Kind.
 
-**Comments follow the server's `language`.** All twenty settings declare their comment as one
+**Comments follow the server's `language`.** All twenty-one settings declare their comment as one
 `{config_comment_<path>}` language key (`lang/en.yml`, `lang/zh.yml`; the path's dots and hyphens become
 underscores, for example `{config_comment_email_smtp_host}`), which the framework resolves in the server's
 `language` each time it writes the file (`UltiTools-Reborn#542`), so a fresh install under `language: en`
-writes English comments. On an existing file the comments the framework wrote on those twenty settings
+writes English comments. On an existing file the comments the framework wrote on those twenty-one settings
 (recognised only by exact equality with a text one of the module's shipped catalogues holds, so the Chinese
 comments earlier versions wrote count as the framework's) switch at the next start and after the framework
 rebuilds the language on a bare `/ul reload`, values untouched; a comment an operator wrote by hand is kept
@@ -237,9 +241,9 @@ byte for byte (`UltiKits/UltiTools-Reborn#611`, `UltiKits/UltiMail#42`).
 
 **Three keys that were declared and validated but never read by any production code —
 `mail-expire-days`, `messages.new-mail` and `messages.mail-sent` — were removed by
-UltiKits/UltiMail#23 and have no row here.** `mail-expire-days` described an expiry that does not
-exist (feature request `UltiKits/UltiMail#34`); the two message keys duplicated text the language
-catalogue already supplies (`notify_new_mail`, `mail_sent_success`).
+UltiKits/UltiMail#23 and have no row here.** The old expiry key stays ignored; opt-in expiry now uses
+`expiry.retention-days` (UltiKits/UltiMail#34), never that legacy value. The two message keys duplicated
+text the language catalogue already supplies (`notify_new_mail`, `mail_sent_success`).
 
 | ID | Feature | Kind | How to reach | Permission | Target | Tier | Manual | Source |
 |---|---|---|---|---|---|---|---|---|
@@ -253,6 +257,7 @@ catalogue already supplies (`notify_new_mail`, `mail_sent_success`).
 | ultimail.config.mail.email.smtp-ssl | Use SSL for the recall email path's SMTP connection | config | `config/mail.yml: email.smtp-ssl (default: false)` | n/a | n/a | admin | none | RecallCommand#sendRealEmail |
 | ultimail.config.mail.email.smtp-starttls | Use STARTTLS for the recall email path's SMTP connection (checked only when `email.smtp-ssl` is false) | config | `config/mail.yml: email.smtp-starttls (default: true)` | n/a | n/a | admin | none | RecallCommand#sendRealEmail |
 | ultimail.config.mail.email.smtp-username | SMTP authentication username for the recall email path | config | `config/mail.yml: email.smtp-username (default: "")` | n/a | n/a | admin | brief | RecallCommand#sendRealEmail |
+| ultimail.config.mail.expiry.retention-days | Sent-time retention in full 24-hour days, 0 disables expiry (no storage access); 1-365 enables deletion of old read mail with no pending items or commands from both boxes. Existing eligible mail is included when enabled; backup first. Changes apply next pass after reload, an in-flight pass keeps its snapshot; disabling cannot restore removed rows. The ignored mail-expire-days key never opts in | config | `config/mail.yml: expiry.retention-days (default: 0)` | n/a | n/a | admin | detailed | MailExpiryService#purgeExpiredMail |
 | ultimail.config.mail.max-content-length | Maximum mail content length, in characters | config | `config/mail.yml: max-content-length (default: 500)` | n/a | n/a | admin | brief | MailService#sendMail |
 | ultimail.config.mail.max-items | Maximum item attachments per mail | config | `config/mail.yml: max-items (default: 27)` | n/a | n/a | admin | brief | MailService#createMailData |
 | ultimail.config.mail.max-subject-length | Maximum mail subject length, in characters | config | `config/mail.yml: max-subject-length (default: 50)` | n/a | n/a | admin | brief | MailService#sendMail |

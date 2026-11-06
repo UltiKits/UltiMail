@@ -76,6 +76,41 @@ messages:
   mail-received: "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"
 ```
 
+### Optional mail expiry (unreleased)
+
+Expiry is off by default. In `plugins/UltiTools/pluginConfig/UltiMail/config/mail.yml`,
+set the new setting below, then run `/ul reload UltiMail`:
+
+```yaml
+expiry:
+  retention-days: 0 # 0 = disabled; choose 1-365 to enable
+```
+
+With `retention-days: 30`, a background pass every 1200 server ticks (about one minute at normal
+speed, first pass one minute after load) permanently removes mail that was sent at least 30 full
+24-hour days ago **only if it is read and has no unclaimed items or unexecuted commands**. The shared
+row is removed from both inbox and sentbox, even if one side has not deleted it. Unread mail and mail
+with pending items or commands are retained indefinitely; expiry never returns, grants or executes
+attachments. Already recorded command attempts count as executed, even when a command was rejected.
+Mail stays visible until the pass removes it. This is an asynchronous full-table scan, not a bounded
+batch; very large tables still require storage capacity planning. With JSON storage, deletions follow
+the framework's normal cache-flush durability contract.
+
+Back up mail storage before opting in: enabling applies to existing mail as well as new mail, using
+its original sending time. Setting `0` and reloading stops future passes from deleting mail; it does
+not recover rows already removed, and a pass already running finishes with its previous setting.
+The old `mail-expire-days` key is **still ignored** (and warned about). An old `mail-expire-days: 30`
+never enables the new feature and is not migrated or overwritten. A failed scan or deletion is logged
+and retried on the next pass; a failed deletion does not stop other eligible mail being removed.
+A mailbox GUI opened before a purge can still show the removed mail's text until reopened; it cannot
+claim pending value from expiry because such mail is never eligible for deletion.
+
+邮件过期默认关闭。主动设置新键 `expiry.retention-days` 为 `1-365` 并执行 `/ul reload UltiMail` 后，
+后台每 1200 tick 检查一次，只永久删除自发送起达到天数、已读且没有待领取物品或待执行命令的邮件，
+收件箱和发件箱共用的记录会一起删除。未读邮件和仍有待领取附件或待执行命令的邮件始终保留。
+旧的 `mail-expire-days: 30` 仍无效，不会自动启用或迁移。启用前请备份；改回 `0` 只停止后续清理，
+不能恢复已删邮件，正在运行的一轮仍按原设置完成。这里的天数从发送时间计算，每天为 24 小时。
+
 ## ⚠️ Known limitations / 已知限制
 
 **`messages: {}` adds two extra WARNINGs (non-`zh` servers).** UltiMail ships a default for
@@ -296,6 +331,17 @@ UltiMail/
 ```
 
 ## 📝 更新日志
+
+### Unreleased — mail expiry
+
+Added: opt-in `expiry.retention-days` (`0` by default). Only old, read mail with all item and command
+attachments settled is permanently deleted, from both boxes. Unread mail and pending value never
+expire. Existing `mail-expire-days` values remain ignored; enabling requires choosing the new key.
+Back up storage first: opting in includes existing eligible mail. No pending attachment is destroyed or
+returned by expiry. See "Optional mail expiry" above for timing, reload and storage details.
+
+新增：可主动开启的邮件过期清理，默认关闭；只删除到期、已读且附件已处理的邮件。旧配置不会自动启用，
+启用会清理符合条件的历史邮件，请先备份。未读邮件、待领取物品和待执行命令始终保留。
 
 ### v1.1.0
 
