@@ -295,6 +295,33 @@ UltiMail/
 </dependency>
 ```
 
+### Compatibility verification / 兼容性核查
+
+The dependency above is a build input; `plugin.yml`'s `api-version: 630` is the framework level
+checked at module load. Matching those declarations is not, by itself, a complete binary-compatibility proof.
+UltiTools-API [6.3.0 is available on Maven Central](https://repo.maven.apache.org/maven2/com/ultikits/UltiTools-API/6.3.0/),
+so the example uses the released dependency, not a snapshot.
+
+The historical check recorded in [#50](https://github.com/UltiKits/UltiMail/pull/50) compared only
+`Methodref` and `InterfaceMethodref` entries, with its 6.3.0 result taken against a local
+6.3.0-SNAPSHOT build. It showed that `DataOperator.updateCounted` was absent from 6.2.1 and 6.2.5;
+it did **not** check class or field references, or establish that every reference resolves against the
+released 6.3.0 JAR. [#51](https://github.com/UltiKits/UltiMail/issues/51) records that limitation.
+
+Before the next module release, repeat the reference audit using the release candidate's compiled JAR
+and the **released** framework JAR for its declared minimum. Include class, field and method references
+(including interface methods), resolve inherited members with their JVM descriptors, and record the
+artifact versions, SHA-256 hashes and any unresolved symbols. A metadata test or a successful Maven build
+alone must not be reported as that full audit. This documentation records the requirement; it does not
+claim the broader audit has already been completed.
+
+上面的依赖是构建输入；模块加载时检查的框架级别来自 `plugin.yml` 的 `api-version: 630`，两者一致并不等于
+完整的二进制兼容性证明。6.3.0 正式版已在 Maven Central 上可用。旧检查只比较方法引用，6.3.0 一栏使用的是本地
+SNAPSHOT；它证明旧框架缺少 `DataOperator.updateCounted`，但未核查类和字段引用，也未证明正式版能解析所有引用。
+下次发布模块前，应对候选模块 JAR 与声明下限对应的正式版框架 JAR 重新核查类、字段和方法引用（含接口方法及继承成员，
+按 JVM 描述符解析），记录版本、SHA-256 和未解析符号。元数据测试或 Maven 构建通过不能代替这项核查；此处仅记录要求，
+不声称完整核查已经完成。
+
 ## 📝 更新日志
 
 ### v1.1.0
