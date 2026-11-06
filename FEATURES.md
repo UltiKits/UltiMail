@@ -88,7 +88,7 @@ rather than an error:
 **Positive control:** the line-start form returns `@CmdExecutor` = 3, `@CmdMapping` = 15,
 `@EventListener` = 2 (classes), `@EventHandler` = 5 (handler methods), `@Scheduled` = 1,
 `@ConditionalOnConfig` = 0, `@ConfigEntity` = 1 (class), `@ConfigEntry` = 21, `@Table` = 1
-(`MailData`) — confirmed against the 16 production source files, not by trusting the count
+(`MailData`) — confirmed against the 19 production source files, not by trusting the count
 alone. `MailCommand`'s eleven `@CmdMapping` sites are this module's standing positive control —
 the class with the most sub-commands behind one executor, the shape most likely to silently drop
 a row under a naive approach, confirmed present one by one against `MailCommand.java`'s own
