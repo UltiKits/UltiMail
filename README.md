@@ -78,6 +78,36 @@ messages:
 
 ## ⚠️ Known limitations / 已知限制
 
+**Shared database: sender deletion through another plugin can be undone by a stale mail copy.**
+If two servers share one database, a receiver's open inbox GUI holds the mail as it was when the GUI opened.
+If a third-party plugin on the other server then calls `MailService#deleteMail(MailData, UUID)` or
+`MailService#recordDeletion(MailData, UUID)` with the **sender's** UUID, a later read, attachment claim or
+attached-command action in that already-open inbox can write the old `deleted_by_sender = false` back to
+storage. The mail can reappear in the sender's sentbox. A receiver-side deletion through the API using an
+older `MailData` can likewise leave a receiver-only soft-deleted row instead of removing a mail both sides
+have deleted. The inbox GUI itself has no delete action; `/mail delete`, `/mail delall` and `/mail delread`
+load the receiver's inbox again before deleting.
+
+UltiMail's own commands delete only the receiver's copy, and the sentbox GUI is read-only: this particular
+sender-deletion conflict needs a third-party integration. On shared storage, do not let such an integration
+delete the sender's copy while the receiver can still act on an older copy of that mail. Coordinate the
+operations across servers: stop recipient actions and discard held mail copies, perform the sender deletion,
+then reload the mail before allowing recipient actions again (close and reopen an inbox GUI). Re-reading
+once without coordinating the writers does not prevent another intervening write. This is a documented
+integration limitation, not a cross-server concurrency guarantee (UltiKits/UltiMail#47).
+
+**共享数据库：其他插件执行的发件人删除可能被旧邮件副本撤销。** 两台服务器共用数据库时，收件人已打开的收件箱
+GUI 会保留打开时的邮件副本。此后，若另一台服务器上的第三方插件以**发件人** UUID 调用
+`MailService#deleteMail(MailData, UUID)` 或 `MailService#recordDeletion(MailData, UUID)`，收件人在原 GUI
+中阅读、领取附件或触发附带命令时，可能将旧的 `deleted_by_sender = false` 写回，令邮件重新出现在发件箱中。
+以旧 `MailData` 调用收件人删除 API，也可能只留下收件人已删除的记录，而不是彻底删除双方都已删除的邮件。
+收件箱 GUI 本身没有删除操作；`/mail delete`、`/mail delall` 和 `/mail delread` 都会先重新读取收件箱。
+
+模块自带命令只删除收件人一侧，发件箱 GUI 只读，因此这种发件人删除冲突需要第三方集成才会触发。共用数据库时，
+集成方不要在收件人仍能操作旧副本期间删除发件人一侧。应跨服协调操作：先暂停收件人操作并丢弃持有的邮件副本，
+完成发件人删除，再重新读取邮件后恢复操作（收件箱 GUI 需关闭后重新打开）。不协调写入方、仅重新读取一次，不能防止
+读取与写入之间再次发生冲突。这是集成限制的说明，不是跨服并发安全保证（UltiKits/UltiMail#47）。
+
 **`messages: {}` adds two extra WARNINGs (non-`zh` servers).** UltiMail ships a default for
 `messages.mail-received` in `config/mail.yml`. If you deliberately write the whole `messages` section as an
 explicit empty value (`messages: {}`, `messages: ~` or `messages: null`), the file is never changed: UltiMail runs
