@@ -45,6 +45,8 @@ class UltiMailTest {
         @DisplayName("registerSelf 应该返回 true")
         void shouldReturnTrue() {
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             PluginLogger logger = mock(PluginLogger.class);
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
@@ -59,6 +61,8 @@ class UltiMailTest {
         @DisplayName("registerSelf 应该记录启用消息")
         void shouldLogEnableMessage() {
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             PluginLogger logger = mock(PluginLogger.class);
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.i18n(anyString())).thenAnswer(inv -> inv.getArgument(0));
@@ -132,6 +136,8 @@ class UltiMailTest {
         @DisplayName("onUnregister 应经由模块容器取到监听器并要求它归还物品")
         void returnsOpenSelectorsThroughTheListenerBean() {
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             SimpleContainer container = mock(SimpleContainer.class);
             AttachmentGUIListener listener = mock(AttachmentGUIListener.class);
             when(plugin.getContext()).thenReturn(container);
@@ -197,6 +203,8 @@ class UltiMailTest {
             Files.write(file.toPath(), body.getBytes(StandardCharsets.UTF_8));
 
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             logger = mock(PluginLogger.class);
             lenient().when(plugin.getLogger()).thenReturn(logger);
             // The warnings come from the language file; answered from the real en catalogue.
@@ -246,6 +254,8 @@ class UltiMailTest {
             // key. The path the check uses must equal both places MailConfig names its file: the
             // @ConfigEntity value and the constructor argument.
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             when(plugin.operatorConfigPath()).thenCallRealMethod();
 
             String declared = MailConfig.class.getAnnotation(ConfigEntity.class).value();
@@ -261,6 +271,8 @@ class UltiMailTest {
             // The check is advisory; an exception escaping it from registerSelf() would cost the
             // server its whole mail module. Simulated with the file lookup itself failing.
             UltiMail plugin = mock(UltiMail.class);
+            lenient().when(plugin.runningMinecraftVersion()).thenReturn("1.21.11");
+            lenient().when(plugin.runningFrameworkVersion()).thenReturn("6.3.0");
             logger = mock(PluginLogger.class);
             when(plugin.getLogger()).thenReturn(logger);
             when(plugin.i18n(anyString())).thenAnswer(com.ultikits.plugins.mail.i18n.CatalogueText.answer("en"));
