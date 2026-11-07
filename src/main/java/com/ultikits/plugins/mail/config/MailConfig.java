@@ -53,6 +53,10 @@ public class MailConfig extends AbstractConfigEntity {
     @ConfigEntry(path = "send-cooldown", comment = "{config_comment_send_cooldown}")
     @Range(min = 0, max = 300)
     private int sendCooldown = 10;
+
+    @ConfigEntry(path = "expiry.retention-days", comment = "{config_comment_expiry_retention_days}")
+    @Range(min = 0, max = 365)
+    private volatile int expiryRetentionDays = 0;
     
     // Each text setting's Java default is the one it shipped with in every earlier version, which the
     // framework writes for a missing key; materializeText() then writes the jar's text in the server's

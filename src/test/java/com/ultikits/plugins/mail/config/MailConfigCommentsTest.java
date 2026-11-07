@@ -32,8 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("config/mail.yml comments follow the server language (UltiMail#42)")
 class MailConfigCommentsTest {
 
-    /** The twenty settings whose comments were Chinese, by path: the adoption's scope, counted at master ff63715. */
-    private static final int TOKEN_COMMENTS = 20;
+    /** Every setting, including opt-in expiry, declares one translated comment token. */
+    private static final int TOKEN_COMMENTS = 21;
 
     @TempDir
     Path tempDir;
@@ -67,8 +67,8 @@ class MailConfigCommentsTest {
     }
 
     @Test
-    @DisplayName("control: the entity declares twenty token comments, and none of its comments is Chinese")
-    void twentyTokensAndNoChineseComment() {
+    @DisplayName("control: the entity declares twenty-one token comments, and none of its comments is Chinese")
+    void twentyOneTokensAndNoChineseComment() {
         Map<String, String> comments = declaredComments();
         int tokens = 0;
         for (Map.Entry<String, String> e : comments.entrySet()) {
@@ -102,7 +102,7 @@ class MailConfigCommentsTest {
     }
 
     @Test
-    @DisplayName("a fresh install under language: en writes every one of the twenty comments in English")
+    @DisplayName("a fresh install under language: en writes every one of the twenty-one comments in English")
     void freshInstallWritesEnglishComments() throws Exception {
         ConfigFileFixture.load(ConfigFileFixture.plugin(tempDir, "en"));
 
@@ -118,7 +118,7 @@ class MailConfigCommentsTest {
     }
 
     @Test
-    @DisplayName("a fresh install under language: zh writes every one of the twenty comments in Chinese")
+    @DisplayName("a fresh install under language: zh writes every one of the twenty-one comments in Chinese")
     void freshInstallWritesChineseComments() throws Exception {
         ConfigFileFixture.load(ConfigFileFixture.plugin(tempDir, "zh"));
 
