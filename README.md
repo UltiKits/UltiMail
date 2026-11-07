@@ -76,7 +76,72 @@ messages:
   mail-received: "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"
 ```
 
+### Optional mail expiry (unreleased)
+
+Expiry is off by default. In `plugins/UltiTools/pluginConfig/UltiMail/config/mail.yml`,
+set the new setting below, then run `/ul reload UltiMail`:
+
+```yaml
+expiry:
+  retention-days: 0 # 0 = disabled; choose 1-365 to enable
+```
+
+With `retention-days: 30`, a background pass every 1200 server ticks (about one minute at normal
+speed, first pass one minute after load) permanently removes mail that was sent at least 30 full
+24-hour days ago **only if it is read and has no unclaimed items or unexecuted commands**. The shared
+row is removed from both inbox and sentbox, even if one side has not deleted it. Unread mail and mail
+with pending items or commands are retained indefinitely; expiry never returns, grants or executes
+attachments. Already recorded command attempts count as executed, even when a command was rejected.
+Mail stays visible until the pass removes it. This is an asynchronous full-table scan, not a bounded
+batch; very large tables still require storage capacity planning. With JSON storage, deletions follow
+the framework's normal cache-flush durability contract.
+
+Back up mail storage before opting in: enabling applies to existing mail as well as new mail, using
+its original sending time. Setting `0` and reloading stops future passes from deleting mail; it does
+not recover rows already removed, and a pass already running finishes with its previous setting.
+The old `mail-expire-days` key is **still ignored** (and warned about). An old `mail-expire-days: 30`
+never enables the new feature and is not migrated or overwritten. A failed scan or deletion is logged
+and retried on the next pass; a failed deletion does not stop other eligible mail being removed.
+A mailbox GUI opened before a purge can still show the removed mail's text until reopened; it cannot
+claim pending value from expiry because such mail is never eligible for deletion.
+
+邮件过期默认关闭。主动设置新键 `expiry.retention-days` 为 `1-365` 并执行 `/ul reload UltiMail` 后，
+后台每 1200 tick 检查一次，只永久删除自发送起达到天数、已读且没有待领取物品或待执行命令的邮件，
+收件箱和发件箱共用的记录会一起删除。未读邮件和仍有待领取附件或待执行命令的邮件始终保留。
+旧的 `mail-expire-days: 30` 仍无效，不会自动启用或迁移。启用前请备份；改回 `0` 只停止后续清理，
+不能恢复已删邮件，正在运行的一轮仍按原设置完成。这里的天数从发送时间计算，每天为 24 小时。
+
 ## ⚠️ Known limitations / 已知限制
+
+**Shared database: sender deletion through another plugin can be undone by a stale mail copy.**
+If two servers share one database, a receiver's open inbox GUI holds the mail as it was when the GUI opened.
+If a third-party plugin on the other server then calls `MailService#deleteMail(MailData, UUID)` or
+`MailService#recordDeletion(MailData, UUID)` with the **sender's** UUID, a later read, attachment claim or
+attached-command action in that already-open inbox can write the old `deleted_by_sender = false` back to
+storage. The mail can reappear in the sender's sentbox. A receiver-side deletion through the API using an
+older `MailData` can likewise leave a receiver-only soft-deleted row instead of removing a mail both sides
+have deleted. The inbox GUI itself has no delete action; `/mail delete`, `/mail delall` and `/mail delread`
+load the receiver's inbox again before deleting.
+
+UltiMail's own commands delete only the receiver's copy, and the sentbox GUI is read-only: this particular
+sender-deletion conflict needs a third-party integration. On shared storage, do not let such an integration
+delete the sender's copy while the receiver can still act on an older copy of that mail. Coordinate the
+operations across servers: stop recipient actions and discard held mail copies, perform the sender deletion,
+then reload the mail before allowing recipient actions again (close and reopen an inbox GUI). Re-reading
+once without coordinating the writers does not prevent another intervening write. This is a documented
+integration limitation, not a cross-server concurrency guarantee (UltiKits/UltiMail#47).
+
+**共享数据库：其他插件执行的发件人删除可能被旧邮件副本撤销。** 两台服务器共用数据库时，收件人已打开的收件箱
+GUI 会保留打开时的邮件副本。此后，若另一台服务器上的第三方插件以**发件人** UUID 调用
+`MailService#deleteMail(MailData, UUID)` 或 `MailService#recordDeletion(MailData, UUID)`，收件人在原 GUI
+中阅读、领取附件或触发附带命令时，可能将旧的 `deleted_by_sender = false` 写回，令邮件重新出现在发件箱中。
+以旧 `MailData` 调用收件人删除 API，也可能只留下收件人已删除的记录，而不是彻底删除双方都已删除的邮件。
+收件箱 GUI 本身没有删除操作；`/mail delete`、`/mail delall` 和 `/mail delread` 都会先重新读取收件箱。
+
+模块自带命令只删除收件人一侧，发件箱 GUI 只读，因此这种发件人删除冲突需要第三方集成才会触发。共用数据库时，
+集成方不要在收件人仍能操作旧副本期间删除发件人一侧。应跨服协调操作：先暂停收件人操作并丢弃持有的邮件副本，
+完成发件人删除，再重新读取邮件后恢复操作（收件箱 GUI 需关闭后重新打开）。不协调写入方、仅重新读取一次，不能防止
+读取与写入之间再次发生冲突。这是集成限制的说明，不是跨服并发安全保证（UltiKits/UltiMail#47）。
 
 **`messages: {}` adds two extra WARNINGs (non-`zh` servers).** UltiMail ships a default for
 `messages.mail-received` in `config/mail.yml`. If you deliberately write the whole `messages` section as an
@@ -295,7 +360,45 @@ UltiMail/
 </dependency>
 ```
 
+### Compatibility verification / 兼容性核查
+
+The dependency above is a build input; `plugin.yml`'s `api-version: 630` is the framework level
+checked at module load. Matching those declarations is not, by itself, a complete binary-compatibility proof.
+UltiTools-API [6.3.0 is available on Maven Central](https://repo.maven.apache.org/maven2/com/ultikits/UltiTools-API/6.3.0/),
+so the example uses the released dependency, not a snapshot.
+
+The historical check recorded in [#50](https://github.com/UltiKits/UltiMail/pull/50) compared only
+`Methodref` and `InterfaceMethodref` entries, with its 6.3.0 result taken against a local
+6.3.0-SNAPSHOT build. It showed that `DataOperator.updateCounted` was absent from 6.2.1 and 6.2.5;
+it did **not** check class or field references, or establish that every reference resolves against the
+released 6.3.0 JAR. [#51](https://github.com/UltiKits/UltiMail/issues/51) records that limitation.
+
+Before the next module release, repeat the reference audit using the release candidate's compiled JAR
+and the **released** framework JAR for its declared minimum. Include class, field and method references
+(including interface methods), resolve inherited members with their JVM descriptors, and record the
+artifact versions, SHA-256 hashes and any unresolved symbols. A metadata test or a successful Maven build
+alone must not be reported as that full audit. This documentation records the requirement; it does not
+claim the broader audit has already been completed.
+
+上面的依赖是构建输入；模块加载时检查的框架级别来自 `plugin.yml` 的 `api-version: 630`，两者一致并不等于
+完整的二进制兼容性证明。6.3.0 正式版已在 Maven Central 上可用。旧检查只比较方法引用，6.3.0 一栏使用的是本地
+SNAPSHOT；它证明旧框架缺少 `DataOperator.updateCounted`，但未核查类和字段引用，也未证明正式版能解析所有引用。
+下次发布模块前，应对候选模块 JAR 与声明下限对应的正式版框架 JAR 重新核查类、字段和方法引用（含接口方法及继承成员，
+按 JVM 描述符解析），记录版本、SHA-256 和未解析符号。元数据测试或 Maven 构建通过不能代替这项核查；此处仅记录要求，
+不声称完整核查已经完成。
+
 ## 📝 更新日志
+
+### Unreleased — mail expiry
+
+Added: opt-in `expiry.retention-days` (`0` by default). Only old, read mail with all item and command
+attachments settled is permanently deleted, from both boxes. Unread mail and pending value never
+expire. Existing `mail-expire-days` values remain ignored; enabling requires choosing the new key.
+Back up storage first: opting in includes existing eligible mail. No pending attachment is destroyed or
+returned by expiry. See "Optional mail expiry" above for timing, reload and storage details.
+
+新增：可主动开启的邮件过期清理，默认关闭；只删除到期、已读且附件已处理的邮件。旧配置不会自动启用，
+启用会清理符合条件的历史邮件，请先备份。未读邮件、待领取物品和待执行命令始终保留。
 
 ### v1.1.0
 
