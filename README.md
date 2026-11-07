@@ -113,6 +113,36 @@ claim pending value from expiry because such mail is never eligible for deletion
 
 ## ⚠️ Known limitations / 已知限制
 
+**Shared database: sender deletion through another plugin can be undone by a stale mail copy.**
+If two servers share one database, a receiver's open inbox GUI holds the mail as it was when the GUI opened.
+If a third-party plugin on the other server then calls `MailService#deleteMail(MailData, UUID)` or
+`MailService#recordDeletion(MailData, UUID)` with the **sender's** UUID, a later read, attachment claim or
+attached-command action in that already-open inbox can write the old `deleted_by_sender = false` back to
+storage. The mail can reappear in the sender's sentbox. A receiver-side deletion through the API using an
+older `MailData` can likewise leave a receiver-only soft-deleted row instead of removing a mail both sides
+have deleted. The inbox GUI itself has no delete action; `/mail delete`, `/mail delall` and `/mail delread`
+load the receiver's inbox again before deleting.
+
+UltiMail's own commands delete only the receiver's copy, and the sentbox GUI is read-only: this particular
+sender-deletion conflict needs a third-party integration. On shared storage, do not let such an integration
+delete the sender's copy while the receiver can still act on an older copy of that mail. Coordinate the
+operations across servers: stop recipient actions and discard held mail copies, perform the sender deletion,
+then reload the mail before allowing recipient actions again (close and reopen an inbox GUI). Re-reading
+once without coordinating the writers does not prevent another intervening write. This is a documented
+integration limitation, not a cross-server concurrency guarantee (UltiKits/UltiMail#47).
+
+**共享数据库：其他插件执行的发件人删除可能被旧邮件副本撤销。** 两台服务器共用数据库时，收件人已打开的收件箱
+GUI 会保留打开时的邮件副本。此后，若另一台服务器上的第三方插件以**发件人** UUID 调用
+`MailService#deleteMail(MailData, UUID)` 或 `MailService#recordDeletion(MailData, UUID)`，收件人在原 GUI
+中阅读、领取附件或触发附带命令时，可能将旧的 `deleted_by_sender = false` 写回，令邮件重新出现在发件箱中。
+以旧 `MailData` 调用收件人删除 API，也可能只留下收件人已删除的记录，而不是彻底删除双方都已删除的邮件。
+收件箱 GUI 本身没有删除操作；`/mail delete`、`/mail delall` 和 `/mail delread` 都会先重新读取收件箱。
+
+模块自带命令只删除收件人一侧，发件箱 GUI 只读，因此这种发件人删除冲突需要第三方集成才会触发。共用数据库时，
+集成方不要在收件人仍能操作旧副本期间删除发件人一侧。应跨服协调操作：先暂停收件人操作并丢弃持有的邮件副本，
+完成发件人删除，再重新读取邮件后恢复操作（收件箱 GUI 需关闭后重新打开）。不协调写入方、仅重新读取一次，不能防止
+读取与写入之间再次发生冲突。这是集成限制的说明，不是跨服并发安全保证（UltiKits/UltiMail#47）。
+
 **`messages: {}` adds two extra WARNINGs (non-`zh` servers).** UltiMail ships a default for
 `messages.mail-received` in `config/mail.yml`. If you deliberately write the whole `messages` section as an
 explicit empty value (`messages: {}`, `messages: ~` or `messages: null`), the file is never changed: UltiMail runs
@@ -329,6 +359,33 @@ UltiMail/
     <scope>provided</scope>
 </dependency>
 ```
+
+### Compatibility verification / 兼容性核查
+
+The dependency above is a build input; `plugin.yml`'s `api-version: 630` is the framework level
+checked at module load. Matching those declarations is not, by itself, a complete binary-compatibility proof.
+UltiTools-API [6.3.0 is available on Maven Central](https://repo.maven.apache.org/maven2/com/ultikits/UltiTools-API/6.3.0/),
+so the example uses the released dependency, not a snapshot.
+
+The historical check recorded in [#50](https://github.com/UltiKits/UltiMail/pull/50) compared only
+`Methodref` and `InterfaceMethodref` entries, with its 6.3.0 result taken against a local
+6.3.0-SNAPSHOT build. It showed that `DataOperator.updateCounted` was absent from 6.2.1 and 6.2.5;
+it did **not** check class or field references, or establish that every reference resolves against the
+released 6.3.0 JAR. [#51](https://github.com/UltiKits/UltiMail/issues/51) records that limitation.
+
+Before the next module release, repeat the reference audit using the release candidate's compiled JAR
+and the **released** framework JAR for its declared minimum. Include class, field and method references
+(including interface methods), resolve inherited members with their JVM descriptors, and record the
+artifact versions, SHA-256 hashes and any unresolved symbols. A metadata test or a successful Maven build
+alone must not be reported as that full audit. This documentation records the requirement; it does not
+claim the broader audit has already been completed.
+
+上面的依赖是构建输入；模块加载时检查的框架级别来自 `plugin.yml` 的 `api-version: 630`，两者一致并不等于
+完整的二进制兼容性证明。6.3.0 正式版已在 Maven Central 上可用。旧检查只比较方法引用，6.3.0 一栏使用的是本地
+SNAPSHOT；它证明旧框架缺少 `DataOperator.updateCounted`，但未核查类和字段引用，也未证明正式版能解析所有引用。
+下次发布模块前，应对候选模块 JAR 与声明下限对应的正式版框架 JAR 重新核查类、字段和方法引用（含接口方法及继承成员，
+按 JVM 描述符解析），记录版本、SHA-256 和未解析符号。元数据测试或 Maven 构建通过不能代替这项核查；此处仅记录要求，
+不声称完整核查已经完成。
 
 ## 📝 更新日志
 
