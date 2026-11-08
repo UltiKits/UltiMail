@@ -71,7 +71,8 @@ import java.util.stream.Stream;
  * arrow, a call after a comparison, a forwarding call inside an anonymous class), each fix exposing
  * the next, so the lexer was replaced by the compiler's parser instead of being patched again.
  * <p>
- * This file is copied into every module with one deliberate difference: the modules that have adopted
+ * Module scanners are maintained separately and are not byte-identical copies; this one has a deliberate difference:
+ * the modules that have adopted
  * translatable config comments (UltiMail has; see {@link SiteKind#CONFIG_COMMENT}) also read a comment that is
  * exactly one {@code {key}} token as a catalogue key site, so guard 1 checks that key in both catalogues.
  * The other modules keep the earlier form of that part. Its package line differs as well.
@@ -81,7 +82,8 @@ final class I18nSourceScanner {
     /**
      * Both guards and the framework's {@code check-cjk-scope.sh} detect the same character properties: the Han
      * script, CJK Symbols and Punctuation (U+3000-U+303F) and Halfwidth and Fullwidth Forms (U+FF00-U+FFEF); kana
-     * (U+3040-U+30FF) is out. The Unicode version each one knows follows its toolchain -- the JDK here, PCRE2 on the
+     * (U+3040-U+30FF) is out; halfwidth katakana U+FF65-U+FF9F is in, through the forms range. The Unicode version
+     * each one knows follows its toolchain -- the JDK here, PCRE2 on the
      * CI runner -- so a character added in a newer Unicode version can be matched by one and not yet by the other.
      */
     static final int CJK_SYMBOLS_FIRST = 0x3000;
