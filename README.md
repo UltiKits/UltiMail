@@ -373,32 +373,14 @@ The historical check recorded in [#50](https://github.com/UltiKits/UltiMail/pull
 it did **not** check class or field references, or establish that every reference resolves against the
 released 6.3.0 JAR. [#51](https://github.com/UltiKits/UltiMail/issues/51) records that limitation.
 
-Before the next module release, repeat the reference audit using the release candidate's compiled JAR
-and the **released** framework JAR for its declared minimum. Include class, field and method references
-(including interface methods), resolve inherited members with their JVM descriptors, and record the
-artifact versions, SHA-256 hashes and any unresolved symbols. A metadata test or a successful Maven build
-alone must not be reported as that full audit. This documentation records the requirement; it does not
-claim the broader audit has already been completed.
-
 上面的依赖是构建输入；模块加载时检查的框架级别来自 `plugin.yml` 的 `api-version: 630`，两者一致并不等于
 完整的二进制兼容性证明。6.3.0 正式版已在 Maven Central 上可用。旧检查只比较方法引用，6.3.0 一栏使用的是本地
 SNAPSHOT；它证明旧框架缺少 `DataOperator.updateCounted`，但未核查类和字段引用，也未证明正式版能解析所有引用。
-下次发布模块前，应对候选模块 JAR 与声明下限对应的正式版框架 JAR 重新核查类、字段和方法引用（含接口方法及继承成员，
-按 JVM 描述符解析），记录版本、SHA-256 和未解析符号。元数据测试或 Maven 构建通过不能代替这项核查；此处仅记录要求，
-不声称完整核查已经完成。
 
 ## 📝 更新日志
 
-### Unreleased — mail expiry
-
-Added: opt-in `expiry.retention-days` (`0` by default). Only old, read mail with all item and command
-attachments settled is permanently deleted, from both boxes. Unread mail and pending value never
-expire. Existing `mail-expire-days` values remain ignored; enabling requires choosing the new key.
-Back up storage first: opting in includes existing eligible mail. No pending attachment is destroyed or
-returned by expiry. See "Optional mail expiry" above for timing, reload and storage details.
-
-新增：可主动开启的邮件过期清理，默认关闭；只删除到期、已读且附件已处理的邮件。旧配置不会自动启用，
-启用会清理符合条件的历史邮件，请先备份。未读邮件、待领取物品和待执行命令始终保留。
+Changes not yet in a release, and every release from 2.0.0 on, are listed in
+[CHANGELOG.md](CHANGELOG.md). 尚未发布的更改及 2.0.0 起的各版本见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### v1.1.0
 
