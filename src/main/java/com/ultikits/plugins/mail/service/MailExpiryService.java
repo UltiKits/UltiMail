@@ -53,7 +53,9 @@ public class MailExpiryService {
                 }
                 try {
                     operator.delById(mail.getId());
-                } catch (DataAccessException e) {
+                } catch (RuntimeException e) {
+                    // Not only DataAccessException: a store closing at unload throws
+                    // IllegalStateException, and one row must not end the pass (UltiKits/UltiMail#69).
                     plugin.getLogger().warn(Placeholders.fill(plugin.i18n("log_mail_expiry_delete_failed"),
                             "{MAIL}", mail.getId(), "{ERROR}", String.valueOf(e.getMessage())));
                 }

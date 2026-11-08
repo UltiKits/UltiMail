@@ -5,6 +5,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
+## [Unreleased]
+
+### Added
+
+- Opt-in `expiry.retention-days` (`0` by default). Only old, read mail with all item and command
+  attachments settled is permanently deleted, from both boxes. Unread mail and pending value never
+  expire. Existing `mail-expire-days` values remain ignored; enabling requires choosing the new key.
+  Back up storage first: opting in includes existing eligible mail. No pending attachment is destroyed or
+  returned by expiry. A deletion that fails for any reason is logged with the mail id and does not stop
+  the rest of the pass (UltiKits/UltiMail#69). See "Optional mail expiry" in the README for timing, reload
+  and storage details (UltiKits/UltiMail#34).
+- 新增：可主动开启的邮件过期清理，默认关闭；只删除到期、已读且附件已处理的邮件。旧配置不会自动启用，
+  启用会清理符合条件的历史邮件，请先备份。未读邮件、待领取物品和待执行命令始终保留。单封邮件删除失败
+  （任何原因）会记录邮件 id，不影响同一轮其余邮件的清理。
+
 ## [2.0.0] - 2026-10-21
 
 ### Changed

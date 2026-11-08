@@ -213,6 +213,18 @@ class MailExpiryServiceTest {
     }
 
     @Test
+    void anyRuntimeFailureOfOneDeleteIsLoggedAndDoesNotStopLaterMails() {
+        // UltiKits/UltiMail#69: a store that is closing at unload throws IllegalStateException,
+        // not DataAccessException; the documented "a failed deletion does not stop the remaining
+        // rows" must still hold.
+        stored(oldMail("closing"), oldMail("next"));
+        doThrow(new IllegalStateException("store closed")).when(operator).delById("closing");
+        assertThatCode(() -> service.purgeExpiredMailAt(NOW)).doesNotThrowAnyException();
+        verify(logger).warn("log_mail_expiry_delete_failed closing store closed");
+        verify(operator).delById("next");
+    }
+
+    @Test
     void aFailedScanIsLoggedAndRetriedNextPass() {
         when(operator.getAll()).thenThrow(new DataAccessException("scan offline"))
                 .thenReturn(Collections.singletonList(oldMail("retry")));
