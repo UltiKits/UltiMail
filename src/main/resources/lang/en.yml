@@ -2,6 +2,8 @@
 
 # === System Messages ===
 mail_enabled: "UltiMail has been enabled!"
+startup_incompatible: "UltiMail needs UltiTools 6.4.0 or later on Minecraft versions below 1.21 (server: {SERVER}, UltiTools: {FRAMEWORK}). Please update UltiTools."
+startup_version_unknown: "UltiMail could not determine startup compatibility (server: {SERVER}, UltiTools: {FRAMEWORK}). Continuing without the version check."
 
 # === Inbox ===
 inbox_empty: "Inbox is empty!"

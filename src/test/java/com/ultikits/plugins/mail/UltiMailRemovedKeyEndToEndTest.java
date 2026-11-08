@@ -77,6 +77,8 @@ class UltiMailRemovedKeyEndToEndTest {
         Files.write(file.toPath(), body.getBytes(StandardCharsets.UTF_8));
 
         UltiMail plugin = mock(UltiMail.class, CALLS_REAL_METHODS);
+        doReturn("1.21.11").when(plugin).runningMinecraftVersion();
+        doReturn("6.3.0").when(plugin).runningFrameworkVersion();
         setField(UltiToolsPlugin.class, plugin, "resourceFolderPath", moduleFolder.toString());
         MailConfig config = new MailConfig();
         new ConfigManager().register(plugin, config);
