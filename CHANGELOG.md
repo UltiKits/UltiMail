@@ -5,10 +5,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 本文件记录本项目的所有重要更改，格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)。
 
-## [Unreleased]
+## [2.1.0] - 2026-11-09
 
 ### Added
 
+- On Minecraft versions below 1.21, UltiMail now refuses to start on UltiTools older than 6.4.0 instead of
+  failing later inside a GUI action. The module logs `UltiMail needs UltiTools 6.4.0 or later on Minecraft
+  versions below 1.21 (server: …, UltiTools: …). Please update UltiTools.` and registers no commands,
+  listeners, tasks or GUI entry points. Minecraft 1.21 and later keep working on UltiTools 6.3.0 or later.
+  When either version cannot be read, the module warns and starts as before (UltiKits/UltiMail#67,
+  UltiKits/UltiTools-Reborn#655).
+- 在 1.21 以下的 Minecraft 上，若 UltiTools 低于 6.4.0，UltiMail 现在会在启动时拒绝加载（提示请更新
+  UltiTools），而不是在之后的 GUI 操作中出错；被拒绝时不注册任何命令、监听器、任务或 GUI 入口。Minecraft 1.21
+  及以上仍可在 UltiTools 6.3.0 及以上运行。无法读取版本时只警告并照常启动。
 - Opt-in `expiry.retention-days` (`0` by default). Only old, read mail with all item and command
   attachments settled is permanently deleted, from both boxes. Unread mail and pending value never
   expire. Existing `mail-expire-days` values remain ignored; enabling requires choosing the new key.
@@ -19,6 +28,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 新增：可主动开启的邮件过期清理，默认关闭；只删除到期、已读且附件已处理的邮件。旧配置不会自动启用，
   启用会清理符合条件的历史邮件，请先备份。未读邮件、待领取物品和待执行命令始终保留。单封邮件删除失败
   （任何原因）会记录邮件 id，不影响同一轮其余邮件的清理。
+- The repository now ships the MIT `LICENSE` file that the README already linked to, and `pom.xml`
+  declares the licence (UltiKits/UltiMail#56).
+- 仓库补上了 README 早已链接的 MIT `LICENSE` 文件，`pom.xml` 也声明了该许可证。
+
+### Documentation
+
+- README "Known limitations" explains how a third-party plugin that deletes a sender's copy on a shared
+  database can race recipient operations on another server, and what to coordinate (UltiKits/UltiMail#47).
+- README "Compatibility verification" records the limits of the historical 2.0.0 reference check and the
+  result of the full reference audit for this release (UltiKits/UltiMail#51, #68).
+- `FEATURES.md` no longer claims that the join notification leaves `{0}` unfilled; the unread count is
+  substituted (UltiKits/UltiMail#46).
+- README「已知限制」说明了共享数据库上第三方插件删除发件人副本与其他服务器上的收件人操作之间的竞争及需要的协调；
+  README「兼容性核查」记录了 2.0.0 旧核查的局限以及本版本完整引用核查的结果；`FEATURES.md` 删除了“加入通知不填充
+  `{0}`”的过时说法。
 
 ## [2.0.0] - 2026-10-21
 
