@@ -132,7 +132,7 @@ for real-machine verification, not user-facing documentation.
 
 | ID | Preconditions | Steps | Expected | Layer | Covers |
 |---|---|---|---|---|---|
-| ultimail.lifecycle.compatibility-refuse | Isolated Paper 1.20.6; UltiTools 6.3.0; this UltiMail build installed; `language: en`; no other module owns `mail`, `sendmail` or `recall`; fresh module language files | Start the server. Read startup output and the framework's loaded module list (`ul list` from console). Check the command map, registered listeners and pending scheduler tasks for this module. | Exactly one module refusal message at SEVERE (Paper may label it ERROR): `UltiMail needs UltiTools 6.4.0 or later on Minecraft versions below 1.21 (server: 1.20.6-R0.1-SNAPSHOT, UltiTools: 6.3.0). Please update UltiTools.`; framework additionally logs `[UltiTools-API] UltiMail load failed! Version: 2.0.0.` at WARNING. No `UltiMail has been enabled!`; UltiMail absent from the loaded module list; no UltiMail command, listener, scheduled task or GUI entry point registered. No ICCE or NoSuchMethodError before refusal. | server | UltiMail, StartupCompatibility |
+| ultimail.lifecycle.compatibility-refuse | Isolated Paper 1.20.6; UltiTools 6.3.0; this UltiMail build installed; `language: en`; no other module owns `mail`, `sendmail` or `recall`; fresh module language files | Start the server. Read startup output and the framework's loaded module list (`ul list` from console). Check the command map, registered listeners and pending scheduler tasks for this module. | Exactly one module refusal message at SEVERE (Paper may label it ERROR): `UltiMail needs UltiTools 6.4.0 or later on Minecraft versions below 1.21 (server: 1.20.6-R0.1-SNAPSHOT, UltiTools: 6.3.0). Please update UltiTools.`; framework additionally logs `[UltiTools-API] UltiMail load failed! Version: 2.1.0.` at WARNING. No `UltiMail has been enabled!`; UltiMail absent from the loaded module list; no UltiMail command, listener, scheduled task or GUI entry point registered. No ICCE or NoSuchMethodError before refusal. | server | UltiMail, StartupCompatibility |
 | ultimail.lifecycle.compatibility-allow | Separate isolated Paper 1.21.11; UltiTools 6.3.0; this UltiMail build; `language: en`; fresh module language files; player holding `ultimail.use` | Start the server, read startup output and `ul list`; as the player run `/mail help`. | Module logs `UltiMail has been enabled!`, appears in the loaded module list and `/mail help` begins `=== UltiMail Help ===`; no `startup_incompatible` error or version warning. This row proves activation and command availability, not every GUI action. | server | UltiMail, StartupCompatibility |
 
 `ultimail.lifecycle.unload` below removes this module's jar, so it must be executed AFTER every
@@ -168,7 +168,7 @@ key in `plugins/UltiTools/config.yml` that this module's own `lang/en.yml` strin
 |---|---|---|---|---|---|
 | ultimail.mail.restart-survival | A mail sent to a player who is OFFLINE at send time (via `ultimail.sendmail.text`'s same flow, aimed at an offline receiver) | Stop the server completely, then start it again, then have the receiver join and run `/mail inbox` | The mail sent before the restart is present in the inbox, with its original subject and content intact | server | |
 
-## Mail expiry (unreleased)
+## Mail expiry
 
 Use an isolated test server, not shared or production storage. These rows use default `sqlite`
 storage and `sqlite3 plugins/UltiTools/sqliteDB/UltiMail.db`. Back up the database and

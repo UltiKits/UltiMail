@@ -76,7 +76,7 @@ messages:
   mail-received: "&e[邮件] &f你收到了来自 &a{SENDER} &f的新邮件！"
 ```
 
-### Optional mail expiry (unreleased)
+### Optional mail expiry
 
 Expiry is off by default. In `plugins/UltiTools/pluginConfig/UltiMail/config/mail.yml`,
 set the new setting below, then run `/ul reload UltiMail`:
@@ -376,6 +376,20 @@ released 6.3.0 JAR. [#51](https://github.com/UltiKits/UltiMail/issues/51) record
 上面的依赖是构建输入；模块加载时检查的框架级别来自 `plugin.yml` 的 `api-version: 630`，两者一致并不等于
 完整的二进制兼容性证明。6.3.0 正式版已在 Maven Central 上可用。旧检查只比较方法引用，6.3.0 一栏使用的是本地
 SNAPSHOT；它证明旧框架缺少 `DataOperator.updateCounted`，但未核查类和字段引用，也未证明正式版能解析所有引用。
+
+**2.1.0 reference audit.** The 2.1.0 JAR was checked with the framework's `LinkageAudit` (shipped in
+UltiTools-API 6.4.0), which resolves every class, field and method reference the module makes into the
+Paper/Bukkit/Adventure and UltiTools namespaces, by JVM descriptor and including interface methods and
+inherited members. Against the **released** UltiTools-API 6.3.0 JAR with the Paper 1.21.11 API, nothing is
+unresolved; all 19 UltiTools classes the module references exist in 6.3.0. Against UltiTools-API 6.4.0 with
+the Paper 1.21.11 API and with the Paper 1.19.2 API, nothing is unresolved either. Reflection and
+behaviour behind unchanged signatures are outside such an audit.
+
+**2.1.0 引用核查。** 2.1.0 的 JAR 用框架自带的 `LinkageAudit`（UltiTools-API 6.4.0 起提供）核查过：它按 JVM 描述符
+解析模块对 Paper/Bukkit/Adventure 与 UltiTools 的每个类、字段和方法引用（含接口方法和继承成员）。对照**正式版**
+UltiTools-API 6.3.0 JAR 与 Paper 1.21.11 API，没有未解析的引用，模块引用的 19 个 UltiTools 类在 6.3.0 中都存在；
+对照 UltiTools-API 6.4.0 与 Paper 1.21.11 API、Paper 1.19.2 API，同样没有未解析的引用。反射以及签名不变的行为变化
+不在这类核查范围内。
 
 ## 📝 更新日志
 
